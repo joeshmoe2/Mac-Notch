@@ -16,6 +16,7 @@ final class AppState {
     /// default tab order.
     private static func makeModules() -> [any NotchModule] {
         [
+            TimerModule(),
         ]
     }
 
