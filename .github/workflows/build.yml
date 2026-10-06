@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Build (Debug, unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project NotchHub.xcodeproj \
+            -scheme NotchHub \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee build.log | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
