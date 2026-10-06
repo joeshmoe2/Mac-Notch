@@ -49,7 +49,7 @@ NotchNotes is a regular windowed note-taking app built from the same project (sc
 - In the notch, the window button above a note (or "Open in NotchNotes" in its right-click menu) opens that note in NotchNotes.
 - The first time NotchHub starts after this update, notes from the old `notes.json` are converted to files automatically (the old file is kept as `notes.json.migrated`).
 
-To build it, choose the **NotchNotes** scheme and press ⌘R, or archive it like NotchHub and copy `NotchNotes.app` to Applications.
+**NotchNotes is built into NotchHub.** Building or archiving NotchHub also builds NotchNotes and embeds it at `NotchHub.app/Contents/Helpers/NotchNotes.app`. Open it from the menu bar icon (**Open NotchNotes**), from Settings → Notes, or from the window button on a note. **Settings → Notes → Add to Applications** copies it to `/Applications` so it appears in Launchpad and Spotlight. You can still run it on its own with the **NotchNotes** scheme while developing.
 
 ## Permissions, entitlements and Info.plist keys
 

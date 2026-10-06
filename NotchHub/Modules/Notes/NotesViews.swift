@@ -141,9 +141,25 @@ struct NotesSettingsView: View {
             ForEach(module.notes) { note in Text(note.title).tag(NoteID?.some(note.id)) }
         }
         NotesFolderSettings(store: module.store)
-        LabeledContent("Companion app") {
-            Button("Open NotchNotes") { module.openInCompanion(nil) }
-        }
+        NotchNotesCompanionRow(module: module)
         Text("Tip: start a line with \"- [ ] \" to make a checkbox.").font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// Settings row for the built-in NotchNotes companion app.
+private struct NotchNotesCompanionRow: View {
+    let module: NotesModule
+    @State private var message: String?
+
+    var body: some View {
+        LabeledContent("NotchNotes app") {
+            HStack {
+                Button("Open NotchNotes") { module.openInCompanion(nil) }
+                Button("Add to Applications") { message = module.installCompanionInApplications() }
+            }
+        }
+        Text(message ?? "NotchNotes is built into NotchHub. Open it from here, the menu bar icon, or the window button on a note. Add it to Applications to launch it from Launchpad, Spotlight or the Dock.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 }

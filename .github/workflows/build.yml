@@ -34,6 +34,8 @@ jobs:
           test "$COUNT" -gt 10
           APP=$(find build/Build/Products/Debug -maxdepth 1 -name "NotchHub.app")
           ls -la "$APP/Contents/MacOS"
+          echo "Embedded companion:"
+          ls -la "$APP/Contents/Helpers/NotchNotes.app/Contents/MacOS"
       - name: Build NotchNotes companion (Debug, unsigned)
         run: |
           set -o pipefail

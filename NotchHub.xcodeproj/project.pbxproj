@@ -6,6 +6,34 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		AD0000000000000000000001 /* NotchNotes.app in Embed NotchNotes */ = {isa = PBXBuildFile; fileRef = AB0000000000000000000001 /* NotchNotes.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, CodeSignOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		AD0000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AA0000000000000000000040 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AB0000000000000000000020;
+			remoteInfo = NotchNotes;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AD0000000000000000000003 /* Embed NotchNotes */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				AD0000000000000000000001 /* NotchNotes.app in Embed NotchNotes */,
+			);
+			name = "Embed NotchNotes";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		AA0000000000000000000001 /* NotchHub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchHub.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB0000000000000000000001 /* NotchNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -113,10 +141,12 @@
 				AA0000000000000000000021 /* Sources */,
 				AA0000000000000000000003 /* Frameworks */,
 				AA0000000000000000000022 /* Resources */,
+				AD0000000000000000000003 /* Embed NotchNotes */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AD0000000000000000000004 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				AA0000000000000000000002 /* NotchHub */,
@@ -200,6 +230,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AD0000000000000000000004 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AB0000000000000000000020 /* NotchNotes */;
+			targetProxy = AD0000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AB0000000000000000000052 /* Debug */ = {

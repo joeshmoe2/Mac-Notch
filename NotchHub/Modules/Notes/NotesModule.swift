@@ -83,8 +83,20 @@ final class NotesModule: NotchModule {
 
     // MARK: Companion app
 
+    /// The copy of NotchNotes built into NotchHub.app (always matches this version).
+    static var embeddedCompanionURL: URL {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/NotchNotes.app", isDirectory: true)
+    }
+
+    static var installedCompanionURL: URL {
+        URL(fileURLWithPath: "/Applications/NotchNotes.app", isDirectory: true)
+    }
+
+    /// Prefers the built-in copy; falls back to one installed elsewhere.
     var companionURL: URL? {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.companionBundleID)
+        let fm = FileManager.default
+        if fm.fileExists(atPath: Self.embeddedCompanionURL.path) { return Self.embeddedCompanionURL }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.companionBundleID)
     }
 
     /// Opens NotchNotes, selecting `note` if given.
@@ -94,17 +106,40 @@ final class NotesModule: NotchModule {
             NotesLocation.sharedDefaults.set(store.note(id: note.id)?.fileName ?? note.fileName,
                                              forKey: NotesLocation.openRequestKey)
         }
+        AppState.shared.collapseNotch()
         guard let url = companionURL else {
             let alert = NSAlert()
-            alert.messageText = "NotchNotes isn't installed"
-            alert.informativeText = "Build the NotchNotes scheme in Xcode (or copy NotchNotes.app to Applications), then try again. Your notes are also plain Markdown files you can open in any editor."
+            alert.messageText = "NotchNotes couldn't be found"
+            alert.informativeText = "It's normally built into NotchHub. Rebuild NotchHub in Xcode and try again. Your notes are also plain Markdown files you can open in any editor."
             alert.addButton(withTitle: "Show Notes Folder")
             alert.addButton(withTitle: "OK")
             NSApp.activate(ignoringOtherApps: true)
             if alert.runModal() == .alertFirstButtonReturn { store.revealInFinder() }
             return
         }
-        NSWorkspace.shared.openApplication(at: url, configuration: .init())
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration)
+    }
+
+    /// Copies the built-in NotchNotes to /Applications so it shows up in Launchpad and Spotlight.
+    func installCompanionInApplications() -> String {
+        let fm = FileManager.default
+        let source = Self.embeddedCompanionURL
+        let destination = Self.installedCompanionURL
+        guard fm.fileExists(atPath: source.path) else {
+            return "The built-in copy of NotchNotes is missing. Rebuild NotchHub in Xcode."
+        }
+        do {
+            if fm.fileExists(atPath: destination.path) {
+                try fm.trashItem(at: destination, resultingItemURL: nil)
+            }
+            try fm.copyItem(at: source, to: destination)
+            NSWorkspace.shared.activateFileViewerSelecting([destination])
+            return "NotchNotes was added to Applications."
+        } catch {
+            return "Couldn't copy NotchNotes to Applications: \(error.localizedDescription)"
+        }
     }
 
     // MARK: Migration from the old notes.json

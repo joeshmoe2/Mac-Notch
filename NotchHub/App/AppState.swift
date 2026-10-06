@@ -25,6 +25,14 @@ final class AppState {
         ]
     }
 
+    func collapseNotch() {
+        NotchWindowManager.shared.collapseAll()
+    }
+
+    func openNotchNotes() {
+        module(NotesModule.self)?.openInCompanion(nil)
+    }
+
     func prepareForExpand() {
         for module in registry.enabled { module.willExpand() }
     }

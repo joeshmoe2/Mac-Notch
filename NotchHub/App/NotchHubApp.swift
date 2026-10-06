@@ -32,6 +32,7 @@ private struct MenuBarLabel: View {
 private struct MenuBarContent: View {
     var body: some View {
         Button("Toggle Notch") { NotchWindowManager.shared.toggle() }
+        Button("Open NotchNotes") { AppState.shared.openNotchNotes() }
         Divider()
         SettingsLink { Text("Settings…") }
             .keyboardShortcut(",")
