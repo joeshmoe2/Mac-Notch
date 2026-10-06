@@ -29,6 +29,8 @@ final class NotchWindowController {
 
         let root = NotchRootView(viewModel: viewModel, controller: NotchActions(controller: self))
         let hosting = NSHostingView(rootView: root)
+        // The panel's frame is driven by layout(), never by SwiftUI's ideal size.
+        hosting.sizingOptions = []
         hosting.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(hosting)
         NSLayoutConstraint.activate([

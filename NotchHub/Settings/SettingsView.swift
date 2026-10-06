@@ -216,29 +216,11 @@ struct ModulesSettingsView: View {
             Section {
                 List {
                     ForEach(registry.ordered, id: \.id) { module in
-                        HStack {
-                            Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
-                            Image(systemName: module.icon).frame(width: 20)
-                            Text(module.name)
-                            Spacer()
-                            Toggle("Home", isOn: Binding(
-                                get: { registry.isOnHome(module.id) },
-                                set: { registry.setOnHome(module.id, $0) }
-                            ))
-                            .toggleStyle(.checkbox)
-                            .disabled(!registry.isEnabled(module.id))
-                            Toggle("Enabled", isOn: Binding(
-                                get: { registry.isEnabled(module.id) },
-                                set: { registry.setEnabled(module.id, $0) }
-                            ))
-                            .labelsHidden()
-                            .toggleStyle(.switch)
-                            .controlSize(.small)
-                        }
+                        ModuleSettingsRow(registry: registry, id: module.id, name: module.name, icon: module.icon)
                     }
                     .onMove { registry.move(fromOffsets: $0, toOffset: $1) }
                 }
-                .frame(minHeight: CGFloat(registry.all.count) * 30 + 10)
+                .frame(minHeight: listHeight(rows: registry.all.count))
             } header: {
                 Text("Tabs")
             } footer: {
@@ -249,30 +231,75 @@ struct ModulesSettingsView: View {
             Section {
                 List {
                     ForEach(registry.liveOrder, id: \.self) { id in
-                        if let module = registry.module(id: id) {
-                            HStack {
-                                Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
-                                Image(systemName: module.icon).frame(width: 20)
-                                Text(module.name)
-                                Spacer()
-                                Toggle("Show", isOn: Binding(
-                                    get: { registry.isLiveActivityAllowed(id) },
-                                    set: { registry.setLiveActivityAllowed(id, $0) }
-                                ))
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
-                            }
-                        }
+                        LiveActivitySettingsRow(registry: registry, id: id)
                     }
                     .onMove { registry.moveLiveActivity(fromOffsets: $0, toOffset: $1) }
                 }
-                .frame(minHeight: CGFloat(registry.liveOrder.count) * 30 + 10)
+                .frame(minHeight: listHeight(rows: registry.liveOrder.count))
             } header: {
                 Text("Live Activities")
             } footer: {
                 Text("Shown beside the notch while collapsed. When several are active, the highest one in this list wins.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func listHeight(rows: Int) -> CGFloat {
+        CGFloat(rows) * 30 + 10
+    }
+}
+
+private struct ModuleSettingsRow: View {
+    let registry: ModuleRegistry
+    let id: String
+    let name: String
+    let icon: String
+
+    private var enabled: Binding<Bool> {
+        Binding(get: { registry.isEnabled(id) }, set: { registry.setEnabled(id, $0) })
+    }
+
+    private var onHome: Binding<Bool> {
+        Binding(get: { registry.isOnHome(id) }, set: { registry.setOnHome(id, $0) })
+    }
+
+    var body: some View {
+        HStack {
+            Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
+            Image(systemName: icon).frame(width: 20)
+            Text(name)
+            Spacer()
+            Toggle("Home", isOn: onHome)
+                .toggleStyle(.checkbox)
+                .disabled(!registry.isEnabled(id))
+            Toggle("Enabled", isOn: enabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
+    }
+}
+
+private struct LiveActivitySettingsRow: View {
+    let registry: ModuleRegistry
+    let id: String
+
+    private var allowed: Binding<Bool> {
+        Binding(get: { registry.isLiveActivityAllowed(id) }, set: { registry.setLiveActivityAllowed(id, $0) })
+    }
+
+    var body: some View {
+        if let module = registry.module(id: id) {
+            HStack {
+                Image(systemName: "line.3.horizontal").foregroundStyle(.tertiary)
+                Image(systemName: module.icon).frame(width: 20)
+                Text(module.name)
+                Spacer()
+                Toggle("Show", isOn: allowed)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
             }
         }
     }
