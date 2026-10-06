@@ -24,6 +24,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee build.log | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" || true
           grep -q "BUILD SUCCEEDED" build.log
+      - name: Verify sources were compiled
+        run: |
+          COUNT=$(grep -cE "^SwiftCompile .*\.swift" build.log || true)
+          echo "Compiled Swift files: $COUNT"
+          grep -E "^SwiftCompile .*\.swift" build.log | sed -E 's/.* ([^ ]+\.swift).*/\1/' | xargs -n1 basename | sort -u
+          test "$COUNT" -gt 10
+          APP=$(find build/Build/Products/Debug -maxdepth 1 -name "NotchHub.app")
+          ls -la "$APP/Contents/MacOS"
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4

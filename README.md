@@ -1,0 +1,198 @@
+# NotchHub
+
+NotchHub turns the MacBook notch into an expandable widget hub, similar in spirit to NotchNook and Boring Notch. It's a native Swift + SwiftUI app (with AppKit where needed) for **macOS 14 Sonoma or later**.
+
+Move the cursor onto the notch and it springs open into a panel with tabs for:
+
+- **Timer**: run several timers at once.
+- **Pomodoro**: focus and break cycles.
+- **Notes**: quick notes, with checklists.
+- **File Shelf**: a temporary drop zone for files.
+- **Weather**: current conditions and an hourly forecast.
+- **Now Playing**: Music and Spotify controls, volume and output device.
+
+There is also a **Home** dashboard that shows several modules at once. While the notch is collapsed, it can show small *live activities* on either side of the camera housing: album art with audio bars, a timer countdown, or a Pomodoro ring.
+
+---
+
+## Building
+
+Requirements: **Xcode 16 or later** (the project uses Xcode 16's folder-synchronized groups) and macOS 14 or later.
+
+1. Open `NotchHub.xcodeproj`.
+2. Select the **NotchHub** scheme and *My Mac*, then press **Run**.
+
+The project is set to *Sign to Run Locally*, so it builds without a developer team. To distribute it, choose your team under *Signing & Capabilities*.
+
+From the command line:
+
+```bash
+xcodebuild -project NotchHub.xcodeproj -scheme NotchHub -configuration Release build
+```
+
+New `.swift` files you add anywhere under `NotchHub/` are picked up automatically. You don't need to edit `project.pbxproj`.
+
+The CI workflow `.github/workflows/build.yml` builds the project on a macOS runner for every push.
+
+NotchHub is an agent app (`LSUIElement`), so it has **no Dock icon**. Use the menu bar icon (▭) to toggle the notch, open Settings, or quit. The default global shortcut is **⌥⌘N**.
+
+---
+
+## Permissions, entitlements and Info.plist keys
+
+| Purpose | Info.plist key / entitlement | Notes |
+|---|---|---|
+| Agent app (no Dock icon) | `LSUIElement = YES` | Set in `Info.plist` and as `INFOPLIST_KEY_LSUIElement`. |
+| Weather location | `NSLocationWhenInUseUsageDescription`, `NSLocationUsageDescription` | Asked the first time Weather refreshes. If you deny it, set a city in **Settings → Weather**. |
+| Location under the Hardened Runtime or sandbox | `com.apple.security.personal-information.location` | In `NotchHub.entitlements`. |
+| Controlling Music and Spotify | `NSAppleEventsUsageDescription` | macOS asks once per player ("NotchHub wants to control Spotify"). |
+| Apple Events under the Hardened Runtime | `com.apple.security.automation.apple-events` | In `NotchHub.entitlements`. |
+| Notifications | none | Requested the first time a timer or Pomodoro starts. |
+| Launch at login | none | Uses `SMAppService.mainApp`. If macOS asks, approve NotchHub in *System Settings → General → Login Items*. |
+| Global shortcut | none | Uses Carbon `RegisterEventHotKey`, which doesn't need Accessibility permission. |
+| Hover detection | none | Global `mouseMoved` / `leftMouseDragged` monitors don't need Accessibility permission. Only key monitors do. |
+
+When a permission is denied, the module shows an explanation and a button that opens the right pane in System Settings. Each module keeps working as far as it can without the permission: Weather falls back to a manual city, timers still ring in-app, and Now Playing explains what is missing.
+
+The app is **not sandboxed** by default, which makes AppleScript and CoreAudio simpler to use. To sandbox it, add the App Sandbox capability plus these entitlements:
+
+- `com.apple.security.network.client` (for Open-Meteo)
+- `com.apple.security.files.user-selected.read-write`
+- `com.apple.security.files.bookmarks.app-scope`
+- `com.apple.security.temporary-exception.apple-events` listing `com.apple.Music` and `com.spotify.client`
+
+The File Shelf detects the sandbox automatically and switches to security-scoped bookmarks.
+
+---
+
+## Architecture
+
+```
+NotchHub/
+├── App/                 NotchHubApp (@main, MenuBarExtra, Settings scene), AppDelegate, AppState
+├── NotchWindow/         AppKit panel + SwiftUI shell
+│   ├── NotchPanel.swift              non-activating NSPanel + tracking container view
+│   ├── NotchWindowController.swift   hover/click/drag state machine, event monitors
+│   ├── NotchWindowManager.swift      one controller per screen, display change handling
+│   ├── NotchGeometry.swift           notch detection (safeAreaInsets + auxiliaryTop*Area)
+│   ├── NotchViewModel.swift          @Observable per-screen UI state
+│   ├── NotchRootView.swift           shape, background, collapsed live activity, drop target
+│   ├── ExpandedView.swift            header tab bar, Home dashboard
+│   ├── NotchShape.swift              animatable notch silhouette, blur background
+│   └── SharedComponents.swift        buttons, progress ring, permission row
+├── Modules/
+│   ├── NotchModule.swift             the module protocol + LiveActivity
+│   ├── ModuleRegistry.swift          enable/order/home/live-activity priorities
+│   ├── Timer/  Pomodoro/  Notes/  FileShelf/  Weather/  Audio/
+├── Services/            Location, Weather (Open-Meteo), Media (AppleScript), MediaRemote (optional),
+│                        AudioDevice (CoreAudio), Notifications, HotKey, AppleScriptRunner
+├── Models/              CountdownTimer, Note, ShelfItem, WeatherModels, JSONStore
+├── Settings/            Preferences (typed UserDefaults keys), SettingsView, SettingsTransfer
+└── Resources/           Assets
+```
+
+### Key design decisions
+
+- **The window code is AppKit-only.** `NotchPanel` is a borderless `.nonactivatingPanel` at `mainMenu + 3` level, with `canJoinAllSpaces` and `fullScreenAuxiliary`. That keeps it above the menu bar, on every Space and over full-screen apps, and it never takes focus. It can become key only when you click into a text field.
+- **Mouse handling.**
+  - **Collapsed:** the panel sets `ignoresMouseEvents = true`, so clicks pass through to the menu bar. Hover is detected with a global `mouseMoved` monitor, which costs nothing while the mouse is elsewhere.
+  - **Expanded:** an `NSTrackingArea` (`.activeAlways`) plus the global monitor detect when the mouse leaves.
+  - **File drags:** detected by watching the drag pasteboard's `changeCount` during `leftMouseDragged`, so the notch can open *before* the drop lands.
+- **Collapse is suppressed** while:
+  - a file drag is over the notch,
+  - a text view is first responder,
+  - a mouse button is held (for example, while dragging a shelf item out),
+  - or a share sheet, menu or child window is open.
+
+  Esc or a click elsewhere always closes it.
+- **Low idle CPU.** Nothing polls.
+  - Timers and Pomodoro schedule one `Task.sleep` until their end date. Their views redraw with `TimelineView(.periodic)` only while visible.
+  - Now Playing listens to Music and Spotify distributed notifications.
+  - Volume and output devices use CoreAudio property listeners.
+  - Weather wakes once per refresh interval.
+- **Display changes.** `didChangeScreenParametersNotification` and wake events trigger a debounced rebuild of the per-screen panels. That covers plugging in monitors, closing the lid (the notch moves to the main screen) and resolution changes.
+- **Animations.** The notch frame and shape animate with springs scaled by the *Animation speed* setting. Tab selection uses `matchedGeometryEffect`, and the album art morphs between the collapsed live activity and the expanded player.
+- **Settings.**
+  - Every setting is a typed `PrefKey` (namespaced `nh.*`) used through `@AppStorage(Prefs.someKey)` in views, or `Prefs.someKey.value` in non-view code.
+  - Export, import and reset work generically on the `nh.` prefix.
+  - Module choices (order, enabled, Home, live-activity priority) are persisted by `ModuleRegistry`.
+- **Data.** Notes, shelf items and the weather cache are JSON files in `~/Library/Application Support/NotchHub/`.
+
+---
+
+## Adding a new module
+
+1. Create `NotchHub/Modules/MyThing/MyThingModule.swift`:
+
+```swift
+import SwiftUI
+
+extension Prefs {
+    // Per-module settings: keys are namespaced automatically ("nh.mything.greeting").
+    static let myThingGreeting = PrefKey("mything.greeting", "Hello")
+}
+
+@Observable
+@MainActor
+final class MyThingModule: NotchModule {
+    let id = "mything"            // stable, used for persistence
+    let name = "My Thing"
+    let icon = "star.fill"        // SF Symbol
+
+    var count = 0
+
+    func compactView() -> AnyView {          // tile on the Home dashboard
+        AnyView(Text("Count: \(count)"))
+    }
+
+    func expandedView() -> AnyView {         // full tab content
+        AnyView(Button("Tap") { self.count += 1 }.buttonStyle(PillButtonStyle()))
+    }
+
+    func settingsView() -> AnyView {         // rows inside Settings → My Thing
+        AnyView(MyThingSettings())
+    }
+
+    // Optional:
+    var supportsLiveActivity: Bool { true }
+    var liveActivity: LiveActivity? {        // nil = nothing to show
+        guard count > 0 else { return nil }
+        return LiveActivity(moduleID: id) {
+            Image(systemName: icon)
+        } trailing: {
+            Text("\(count)").monospacedDigit()
+        }
+    }
+    func setActive(_ active: Bool) { /* start/stop observers */ }
+    func willExpand() { /* refresh stale data */ }
+}
+
+struct MyThingSettings: View {
+    @AppStorage(Prefs.myThingGreeting) private var greeting
+    var body: some View { TextField("Greeting", text: $greeting) }
+}
+```
+
+2. Register it in `AppState.makeModules()`. Its position in that list is the default tab order.
+
+That's all. The module automatically appears:
+
+- in the tab bar,
+- in **Settings → Modules** (enable, reorder, Home, live-activity priority),
+- and in the Settings sidebar with its own page.
+
+Because modules are `@Observable` classes, SwiftUI updates the tab, the Home tile and the live activity automatically whenever the module's state changes.
+
+---
+
+## Known limitations
+
+- **Now Playing only supports Music and Spotify by default.** The private MediaRemote framework, which would cover every player, is restricted to Apple-entitled processes on macOS 15.4 and later. It's available as an opt-in experimental fallback (*Settings → Now Playing*), and the tradeoffs are documented in `MediaRemoteBridge.swift`.
+- **AppleScript needs the player to be running.** NotchHub never launches Music or Spotify itself. The first contact with each player triggers a macOS Automation prompt.
+- **Music artwork** comes back as raw data over AppleScript. Some streamed tracks have no artwork data, and a placeholder is shown.
+- **The notch geometry comes from public NSScreen APIs.** On a few scaled resolutions the overlay can be off by a point or two; it includes 2 pt of overdraw to hide this.
+- **Clicking inside the expanded notch while another app is in full screen** may briefly show the menu bar, which is macOS behavior for windows at menu-bar level.
+- **Timers aren't persisted across app restarts**, while the Pomodoro daily count is. Notes and the shelf are persisted.
+- **The shelf auto-clear check** runs when the notch opens and at launch, not on a background timer.
+- **Live activities show one module at a time**, the highest-priority active one.
+- **Launch at login** needs the app in `/Applications` (or another stable location) to behave reliably.
