@@ -21,11 +21,12 @@ struct PillButtonStyle: ButtonStyle {
     }
 }
 
-/// Small circular icon button.
+/// Small circular icon button. `help` is required so every icon explains itself on hover.
 struct IconButton: View {
     let icon: String
     var size: CGFloat = 12
-    var help: String?
+    let help: String
+    var tooltipEdge: VerticalEdge = .bottom
     let action: () -> Void
     @State private var hovering = false
 
@@ -38,8 +39,67 @@ struct IconButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .help(help ?? "")
+        .tooltip(help, edge: tooltipEdge) { hovering = $0 }
+    }
+}
+
+// MARK: - Hover tooltips
+
+/// Shows a small label after hovering for a moment.
+///
+/// The notch lives in a non-activating panel of a background app, where
+/// standard macOS tooltips (`.help`) often don't appear, so this draws its own.
+/// `.help` is still applied for VoiceOver and for when the app is active.
+private struct HoverTooltip: ViewModifier {
+    let text: String
+    let edge: VerticalEdge
+    let onHover: ((Bool) -> Void)?
+    @State private var visible = false
+    @State private var delay: Task<Void, Never>?
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                onHover?(inside)
+                delay?.cancel()
+                if inside {
+                    delay = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(450))
+                        guard !Task.isCancelled else { return }
+                        withAnimation(.easeOut(duration: 0.12)) { visible = true }
+                    }
+                } else {
+                    visible = false
+                }
+            }
+            .overlay(alignment: edge == .bottom ? .bottom : .top) {
+                if visible && !text.isEmpty {
+                    Text(text)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Capsule().fill(Color(white: 0.16)))
+                        .overlay(Capsule().strokeBorder(Color.white.opacity(0.15)))
+                        .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+                        .alignmentGuide(edge == .bottom ? .bottom : .top) { d in
+                            edge == .bottom ? d[.top] - 4 : d[.bottom] + 4
+                        }
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                }
+            }
+            .zIndex(visible ? 100 : 0)
+            .help(text)
+    }
+}
+
+extension View {
+    /// Adds a hover label. Pass `onHover` instead of a separate `.onHover` to track hover state.
+    func tooltip(_ text: String, edge: VerticalEdge = .bottom, onHover: ((Bool) -> Void)? = nil) -> some View {
+        modifier(HoverTooltip(text: text, edge: edge, onHover: onHover))
     }
 }
 

@@ -45,8 +45,9 @@ NotchNotes is a regular windowed note-taking app built from the same project (sc
 - **Storage**: every note is a Markdown file (`.md`) in `~/Documents/NotchHub Notes/` by default. You can change the folder in either app's settings (Settings → Notes in NotchHub, ⌘, in NotchNotes) and both apps follow. Put it in iCloud Drive to sync between Macs, or open the files in any editor.
 - **File names follow the note's first line.** Deleting a note moves its file to the Trash.
 - **Live sync**: both apps watch the folder, so edits in one show up in the other within a moment. Changes made in other editors appear too.
+- **Getting there**: the notes button next to Settings in the notch's top bar, the **Open in NotchNotes** button in the Notes tab, or **Open NotchNotes** in the menu bar menu.
+- **Deleting is deliberate**: there's no ⌘⌫ shortcut (that key keeps deleting text in the editor). Deleting asks for confirmation (in the notch, click the trash icon twice), and the file goes to the Trash.
 - **Features**: sidebar with search, a large editor, a checklist view (⇧⌘K), insert checkbox (⇧⌘L), word count, share and Show in Finder.
-- In the notch, the window button above a note (or "Open in NotchNotes" in its right-click menu) opens that note in NotchNotes.
 - The first time NotchHub starts after this update, notes from the old `notes.json` are converted to files automatically (the old file is kept as `notes.json.migrated`).
 
 **NotchNotes is built into NotchHub.** Building or archiving NotchHub also builds NotchNotes and embeds it at `NotchHub.app/Contents/Helpers/NotchNotes.app`. Open it from the menu bar icon (**Open NotchNotes**), from Settings → Notes, or from the window button on a note. **Settings → Notes → Add to Applications** copies it to `/Applications` so it appears in Launchpad and Spotlight. You can still run it on its own with the **NotchNotes** scheme while developing.

@@ -59,6 +59,9 @@ struct ExpandedView: View {
 
             HStack(spacing: 4) {
                 Spacer(minLength: 0)
+                HeaderIconButton(icon: "note.text", help: "Open NotchNotes app") {
+                    AppState.shared.openNotchNotes()
+                }
                 HeaderIconButton(icon: "gearshape.fill", help: "Settings") {
                     actions.collapse()
                     SettingsOpener.open()
@@ -113,8 +116,7 @@ private struct TabButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(title)
-        .onHover { hovering = $0 }
+        .tooltip(title) { hovering = $0 }
     }
 }
 
@@ -134,8 +136,7 @@ struct HeaderIconButton: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(help)
-        .onHover { hovering = $0 }
+        .tooltip(help) { hovering = $0 }
     }
 }
 

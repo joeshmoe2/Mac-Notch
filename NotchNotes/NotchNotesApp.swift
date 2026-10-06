@@ -21,8 +21,8 @@ struct NotchNotesApp: App {
                 Button("Show Notes Folder in Finder") { model.store.revealInFinder() }
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                 Divider()
-                Button("Move Note to Trash") { model.deleteSelected() }
-                    .keyboardShortcut(.delete, modifiers: [.command])
+                // No keyboard shortcut on purpose: ⌘⌫ must keep deleting text in the editor.
+                Button("Move Note to Trash…") { model.requestDelete(model.selection) }
                     .disabled(model.selectedNote == nil)
             }
             CommandMenu("Format") {
@@ -48,6 +48,8 @@ final class NotesAppModel {
     var selection: NoteID?
     var searchText = ""
     var checklistMode = false
+    /// Note waiting for delete confirmation.
+    var pendingDeleteID: NoteID?
 
     init() {
         selection = store.notes.first?.id
@@ -68,6 +70,18 @@ final class NotesAppModel {
         searchText = ""
         checklistMode = false
         selection = store.createNote().id
+    }
+
+    /// Asks for confirmation before moving a note to the Trash.
+    func requestDelete(_ id: NoteID?) {
+        pendingDeleteID = id
+    }
+
+    func confirmPendingDelete() {
+        guard let id = pendingDeleteID else { return }
+        pendingDeleteID = nil
+        selection = id
+        deleteSelected()
     }
 
     func deleteSelected() {

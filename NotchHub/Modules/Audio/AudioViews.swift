@@ -75,6 +75,7 @@ struct AudioExpandedView: View {
                     .matchedAlbumArt()
                     .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
                     .onTapGesture { media.openPlayer() }
+                    .tooltip("Open \(playing.player.displayName)")
                 VStack(alignment: .leading, spacing: 6) {
                     Text(playing.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                     Text(playing.artist).foregroundStyle(.secondary).lineLimit(1)
@@ -116,9 +117,10 @@ struct AudioExpandedView: View {
     private func controls(_ playing: NowPlaying) -> some View {
         HStack(spacing: 18) {
             Spacer()
-            ControlButton(icon: "backward.fill", size: 16) { media.previous() }
-            ControlButton(icon: playing.isPlaying ? "pause.fill" : "play.fill", size: 22) { media.playPause() }
-            ControlButton(icon: "forward.fill", size: 16) { media.next() }
+            ControlButton(icon: "backward.fill", size: 16, help: "Previous track") { media.previous() }
+            ControlButton(icon: playing.isPlaying ? "pause.fill" : "play.fill", size: 22,
+                          help: playing.isPlaying ? "Pause" : "Play") { media.playPause() }
+            ControlButton(icon: "forward.fill", size: 16, help: "Next track") { media.next() }
             Spacer()
         }
     }
@@ -146,6 +148,7 @@ struct AudioExpandedView: View {
 private struct ControlButton: View {
     let icon: String
     let size: CGFloat
+    let help: String
     let action: () -> Void
     @State private var hovering = false
 
@@ -158,7 +161,7 @@ private struct ControlButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
+        .tooltip(help, edge: .top) { hovering = $0 }
     }
 }
 
@@ -171,6 +174,7 @@ struct VolumeRow: View {
             Image(systemName: devices.volume < 0.01 ? "speaker.slash.fill" : "speaker.wave.1.fill")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+                .tooltip("Volume \(Int(devices.volume * 100))%", edge: .top)
             Slider(value: Binding(get: { Double(devices.volume) }, set: { devices.setVolume(Float($0)) }), in: 0...1)
                 .controlSize(.mini)
                 .disabled(!devices.canSetVolume)
@@ -192,7 +196,7 @@ struct VolumeRow: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help(devices.devices.first { $0.id == devices.defaultOutputID }?.name ?? "Output device")
+            .tooltip("Output: " + (devices.devices.first { $0.id == devices.defaultOutputID }?.name ?? "choose device"), edge: .top)
         }
     }
 }
@@ -213,9 +217,10 @@ struct AudioCompactView: View {
                     }
                 }
                 HStack(spacing: 4) {
-                    IconButton(icon: "backward.fill", size: 9) { media.previous() }
-                    IconButton(icon: playing.isPlaying ? "pause.fill" : "play.fill", size: 9) { media.playPause() }
-                    IconButton(icon: "forward.fill", size: 9) { media.next() }
+                    IconButton(icon: "backward.fill", size: 9, help: "Previous track", tooltipEdge: .top) { media.previous() }
+                    IconButton(icon: playing.isPlaying ? "pause.fill" : "play.fill", size: 9,
+                               help: playing.isPlaying ? "Pause" : "Play", tooltipEdge: .top) { media.playPause() }
+                    IconButton(icon: "forward.fill", size: 9, help: "Next track", tooltipEdge: .top) { media.next() }
                 }
             } else {
                 Text("Nothing playing").font(.caption).foregroundStyle(.secondary)

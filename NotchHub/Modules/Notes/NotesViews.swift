@@ -3,6 +3,8 @@ import SwiftUI
 struct NotesExpandedView: View {
     @Bindable var module: NotesModule
     @State private var checklistMode = false
+    /// Delete needs two clicks: the first "arms" the trash button for a few seconds.
+    @State private var armedDeleteID: NoteID?
     @AppStorage(Prefs.notesMonospaced) private var monospaced
     @Environment(\.notchFontSize) private var fontSize
 
@@ -12,6 +14,25 @@ struct NotesExpandedView: View {
             Divider().overlay(Color.white.opacity(0.1))
             editor
         }
+    }
+
+    private func armDelete(_ id: NoteID) {
+        armedDeleteID = id
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            if armedDeleteID == id { armedDeleteID = nil }
+        }
+    }
+
+    private func confirmDelete(_ note: Note) {
+        let alert = NSAlert()
+        alert.messageText = "Move \"\(note.title)\" to the Trash?"
+        alert.informativeText = "You can restore it from the Trash in Finder."
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn { module.delete(note.id) }
     }
 
     private var sidebar: some View {
@@ -34,11 +55,17 @@ struct NotesExpandedView: View {
                                 }
                                 Button("Open in NotchNotes") { module.openInCompanion(note) }
                                 Button("Show in Finder") { module.store.revealInFinder(note) }
-                                Button("Move to Trash", role: .destructive) { module.delete(note.id) }
+                                Button("Move to Trash…", role: .destructive) { confirmDelete(note) }
                             }
                     }
                 }
             }
+            Button { module.openInCompanion(module.selected) } label: {
+                Label("Open in NotchNotes", systemImage: "macwindow")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(PillButtonStyle())
+            .tooltip("Open your notes in the full NotchNotes app", edge: .top)
         }
     }
 
@@ -63,7 +90,16 @@ struct NotesExpandedView: View {
                         module.setPinned(note.id == module.pinnedID ? nil : note.id)
                     }
                     IconButton(icon: "macwindow", size: 10, help: "Open in NotchNotes") { module.openInCompanion(note) }
-                    IconButton(icon: "trash", size: 10, help: "Move to Trash") { module.delete(note.id) }
+                    IconButton(icon: armedDeleteID == note.id ? "trash.fill" : "trash", size: 10,
+                               help: armedDeleteID == note.id ? "Click again to move to Trash" : "Move to Trash") {
+                        if armedDeleteID == note.id {
+                            armedDeleteID = nil
+                            module.delete(note.id)
+                        } else {
+                            armDelete(note.id)
+                        }
+                    }
+                    .foregroundStyle(armedDeleteID == note.id ? Color.red : Color.primary)
                 }
                 if checklistMode {
                     ChecklistView(note: note) { line in module.toggleCheckbox(noteID: note.id, line: line) }

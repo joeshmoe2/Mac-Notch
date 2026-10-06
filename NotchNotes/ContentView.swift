@@ -19,10 +19,23 @@ struct ContentView: View {
                     Text("Pick a note on the left or press ⌘N to start a new one.")
                 } actions: {
                     Button("New Note") { model.newNote() }
+                        .help("Create a new note (⌘N)")
                 }
             }
         }
         .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search notes")
+        .confirmationDialog(
+            "Move \"\(model.store.note(id: model.pendingDeleteID)?.title ?? "this note")\" to the Trash?",
+            isPresented: Binding(
+                get: { model.pendingDeleteID != nil },
+                set: { if !$0 { model.pendingDeleteID = nil } }
+            )
+        ) {
+            Button("Move to Trash", role: .destructive) { model.confirmPendingDelete() }
+            Button("Cancel", role: .cancel) { model.pendingDeleteID = nil }
+        } message: {
+            Text("You can restore it from the Trash in Finder.")
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.appDidBecomeActive()
         }
@@ -43,10 +56,7 @@ struct ContentView: View {
                     .contextMenu {
                         Button("Show in Finder") { model.store.revealInFinder(note) }
                         Divider()
-                        Button("Move to Trash", role: .destructive) {
-                            model.selection = note.id
-                            model.deleteSelected()
-                        }
+                        Button("Move to Trash…", role: .destructive) { model.requestDelete(note.id) }
                     }
             }
         }
@@ -131,12 +141,15 @@ private struct NoteEditor: View {
                 ShareLink(item: store.url(for: note.fileName)) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
+                .help("Share this note")
                 Button { store.revealInFinder(note) } label: {
                     Label("Show in Finder", systemImage: "folder")
                 }
-                Button(role: .destructive) { model.deleteSelected() } label: {
+                .help("Show this note's file in Finder")
+                Button(role: .destructive) { model.requestDelete(note.id) } label: {
                     Label("Move to Trash", systemImage: "trash")
                 }
+                .help("Move this note to the Trash")
             }
         }
     }

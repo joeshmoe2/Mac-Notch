@@ -26,6 +26,7 @@ struct TimerExpandedView: View {
                         .onSubmit(startCustom)
                     Button(action: startCustom) { Image(systemName: "play.fill") }
                         .buttonStyle(PillButtonStyle(prominent: true))
+                        .tooltip("Start custom timer")
                         .disabled(TimeFormat.parse(customText) == nil)
                 }
             }
@@ -76,12 +77,13 @@ private struct TimerRow: View {
                 }
                 Spacer()
                 if !timer.isFinished {
-                    IconButton(icon: timer.isRunning ? "pause.fill" : "play.fill") {
+                    IconButton(icon: timer.isRunning ? "pause.fill" : "play.fill",
+                               help: timer.isRunning ? "Pause timer" : "Resume timer") {
                         timer.isRunning ? module.pause(timer.id) : module.resume(timer.id)
                     }
                 }
-                IconButton(icon: "arrow.counterclockwise") { module.reset(timer.id) }
-                IconButton(icon: "xmark") { module.remove(timer.id) }
+                IconButton(icon: "arrow.counterclockwise", help: "Reset timer") { module.reset(timer.id) }
+                IconButton(icon: "xmark", help: "Remove timer") { module.remove(timer.id) }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)

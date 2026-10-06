@@ -70,8 +70,9 @@ struct PomodoroCompactView: View {
                 }
             }
             HStack(spacing: 4) {
-                IconButton(icon: module.isRunning ? "pause.fill" : "play.fill", size: 10, action: module.toggle)
-                IconButton(icon: "forward.end.fill", size: 10, action: module.skip)
+                IconButton(icon: module.isRunning ? "pause.fill" : "play.fill", size: 10,
+                           help: module.isRunning ? "Pause" : "Start focus", tooltipEdge: .top, action: module.toggle)
+                IconButton(icon: "forward.end.fill", size: 10, help: "Skip to next phase", tooltipEdge: .top, action: module.skip)
                 Spacer()
                 Text("\(module.completedToday) today").font(.caption2).foregroundStyle(.secondary)
             }

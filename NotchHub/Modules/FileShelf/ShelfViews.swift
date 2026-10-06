@@ -69,6 +69,7 @@ private struct ShelfTile: View {
                             .foregroundStyle(.white, .black.opacity(0.7))
                     }
                     .buttonStyle(.plain)
+                    .tooltip("Remove from shelf")
                     .offset(x: 6, y: -6)
                 }
             }
