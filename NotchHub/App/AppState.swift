@@ -17,6 +17,7 @@ final class AppState {
     private static func makeModules() -> [any NotchModule] {
         [
             TimerModule(),
+            PomodoroModule(),
         ]
     }
 

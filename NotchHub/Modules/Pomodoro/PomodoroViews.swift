@@ -1,0 +1,109 @@
+import SwiftUI
+
+struct PomodoroExpandedView: View {
+    let module: PomodoroModule
+
+    var body: some View {
+        HStack(spacing: 24) {
+            TimelineView(.periodic(from: .now, by: module.isRunning ? 1 : 3600)) { context in
+                ZStack {
+                    ProgressRing(progress: module.progress(at: context.date), color: module.phase.color, lineWidth: 8)
+                        .animation(.linear(duration: 1), value: module.progress(at: context.date))
+                    VStack(spacing: 2) {
+                        Text(TimeFormat.clock(module.remaining(at: context.date)))
+                            .font(.system(size: 26, weight: .semibold).monospacedDigit())
+                        Text(module.phase.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(module.phase.color)
+                    }
+                }
+            }
+            .frame(width: 130, height: 130)
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 6) {
+                    ForEach(0..<module.sessionsBeforeLong, id: \.self) { i in
+                        Circle()
+                            .fill(i < module.sessionsInCycle ? PomodoroPhase.work.color : Color.white.opacity(0.15))
+                            .frame(width: 8, height: 8)
+                    }
+                    Text("Cycle").font(.caption).foregroundStyle(.secondary)
+                }
+                Label("\(module.completedToday) focus session\(module.completedToday == 1 ? "" : "s") today",
+                      systemImage: "checkmark.seal.fill")
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 8) {
+                    Button(action: module.toggle) {
+                        Label(module.isRunning ? "Pause" : (module.hasStarted ? "Resume" : "Start"),
+                              systemImage: module.isRunning ? "pause.fill" : "play.fill")
+                    }
+                    .buttonStyle(PillButtonStyle(prominent: true))
+                    Button(action: module.skip) { Label("Skip", systemImage: "forward.end.fill") }
+                        .buttonStyle(PillButtonStyle())
+                    Button(action: module.reset) { Label("Reset", systemImage: "arrow.counterclockwise") }
+                        .buttonStyle(PillButtonStyle())
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .frame(maxHeight: .infinity)
+    }
+}
+
+struct PomodoroCompactView: View {
+    let module: PomodoroModule
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ModuleTileHeader(icon: "leaf.fill", title: module.phase.title)
+            HStack(spacing: 8) {
+                TimelineView(.periodic(from: .now, by: module.isRunning ? 1 : 3600)) { context in
+                    HStack(spacing: 8) {
+                        ProgressRing(progress: module.progress(at: context.date), color: module.phase.color, lineWidth: 3)
+                            .frame(width: 22, height: 22)
+                        Text(TimeFormat.clock(module.remaining(at: context.date)))
+                            .font(.system(size: 20, weight: .semibold).monospacedDigit())
+                    }
+                }
+            }
+            HStack(spacing: 4) {
+                IconButton(icon: module.isRunning ? "pause.fill" : "play.fill", size: 10, action: module.toggle)
+                IconButton(icon: "forward.end.fill", size: 10, action: module.skip)
+                Spacer()
+                Text("\(module.completedToday) today").font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct PomodoroSettingsView: View {
+    let module: PomodoroModule
+    @AppStorage(Prefs.pomodoroWork) private var work
+    @AppStorage(Prefs.pomodoroShortBreak) private var shortBreak
+    @AppStorage(Prefs.pomodoroLongBreak) private var longBreak
+    @AppStorage(Prefs.pomodoroSessionsBeforeLong) private var sessions
+    @AppStorage(Prefs.pomodoroAutoStart) private var autoStart
+    @AppStorage(Prefs.pomodoroNotify) private var notify
+    @AppStorage(Prefs.pomodoroSound) private var sound
+    @AppStorage(Prefs.pomodoroSoundName) private var soundName
+
+    var body: some View {
+        Stepper("Focus: \(work) min", value: $work, in: 1...120)
+        Stepper("Short break: \(shortBreak) min", value: $shortBreak, in: 1...60)
+        Stepper("Long break: \(longBreak) min", value: $longBreak, in: 1...90)
+        Stepper("Sessions before long break: \(sessions)", value: $sessions, in: 1...12)
+        Toggle("Auto-start next phase", isOn: $autoStart)
+        Toggle("Notify at phase changes", isOn: $notify)
+        Toggle("Play sound at phase changes", isOn: $sound)
+        Picker("Sound", selection: $soundName) {
+            ForEach(NotificationService.soundNames, id: \.self) { Text($0).tag($0) }
+        }
+        .disabled(!sound)
+        NotificationPermissionRow()
+            .onChange(of: work) { module.applySettings() }
+            .onChange(of: shortBreak) { module.applySettings() }
+            .onChange(of: longBreak) { module.applySettings() }
+    }
+}
