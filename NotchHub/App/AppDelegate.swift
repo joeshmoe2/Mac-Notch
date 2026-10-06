@@ -11,6 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = AppState.shared
         NotchWindowManager.shared.start()
         HotKeyService.shared.applyPreferences()
+        // Remove any website block left behind by a crash.
+        WebsiteBlocker.shared.cleanUpOnLaunch()
         lastDisplaySignature = displaySignature
 
         // React to settings changes (from the Settings window, import or reset).

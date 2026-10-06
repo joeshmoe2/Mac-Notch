@@ -5,7 +5,7 @@ NotchHub turns the MacBook notch into an expandable widget hub, similar in spiri
 Move the cursor onto the notch and it springs open into a panel with tabs for:
 
 - **Timer**: run several timers at once.
-- **Pomodoro**: focus and break cycles, with optional app blocking and Focus (Do Not Disturb) during focus sessions.
+- **Pomodoro**: focus and break cycles. During focus it can show a full-screen block screen over distracting apps, block websites, and turn on a Focus (Do Not Disturb).
 - **Notes**: quick notes, with checklists.
 - **File Shelf**: a temporary drop zone for files.
 - **Weather**: current conditions and an hourly forecast.
@@ -49,7 +49,8 @@ NotchHub is an agent app (`LSUIElement`), so it has **no Dock icon**. Use the me
 | Apple Events under the Hardened Runtime | `com.apple.security.automation.apple-events` | In `NotchHub.entitlements`. |
 | Notifications | none | Requested the first time a timer or Pomodoro starts. |
 | Launch at login | none | Uses `SMAppService.mainApp`. If macOS asks, approve NotchHub in *System Settings → General → Login Items*. |
-| Pomodoro app blocking | none | Hides or quits the apps you choose while a focus phase runs (NSWorkspace launch/activate notifications). |
+| Pomodoro app blocking | none | Shows a full-screen block screen (or hides/quits the app) when a chosen app opens during a focus phase (NSWorkspace launch/activate notifications). |
+| Pomodoro website blocking | Administrator password, once | "Install Website Blocker" installs `/usr/local/libexec/notchhub-hosts` (root-owned) and `/etc/sudoers.d/notchhub`, which let NotchHub add/remove only its own marked `0.0.0.0 <domain>` block in `/etc/hosts`. Uninstall from the same settings page. |
 | Pomodoro Focus / Do Not Disturb | none | macOS has no public API for this, so NotchHub runs two Shortcuts you create (`shortcuts run "NotchHub Focus On"` / `"NotchHub Focus Off"`) using the **Set Focus** action. |
 | Global shortcut | none | Uses Carbon `RegisterEventHotKey`, which doesn't need Accessibility permission. |
 | Hover detection | none | Global `mouseMoved` / `leftMouseDragged` monitors don't need Accessibility permission. Only key monitors do. |
@@ -196,6 +197,7 @@ Because modules are `@Observable` classes, SwiftUI updates the tab, the Home til
 - **Clicking inside the expanded notch while another app is in full screen** may briefly show the menu bar, which is macOS behavior for windows at menu-bar level.
 - **Timers aren't persisted across app restarts**, while the Pomodoro daily count is. Notes and the shelf are persisted.
 - **The shelf auto-clear check** runs when the notch opens and at launch, not on a background timer.
+- **Website blocking uses `/etc/hosts`**, so it works in every browser but can be bypassed by a VPN or a browser's "secure DNS" (DNS-over-HTTPS) setting, and tabs already open may keep working until reloaded. It's a focus aid, not parental controls. True Screen Time–style blocking (like Opal) requires Apple's Family Controls entitlement, which Apple grants per developer.
 - **App blocking is "soft"**: a blocked app is hidden (or quit) as soon as it opens or comes to the front, but it isn't prevented from running in the background. Notification silencing depends on the two Shortcuts existing in the Shortcuts app.
 - **Live activities show one module at a time**, the highest-priority active one.
 - **Launch at login** needs the app in `/Applications` (or another stable location) to behave reliably.

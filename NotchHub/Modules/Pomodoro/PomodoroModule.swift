@@ -175,7 +175,7 @@ final class PomodoroModule: NotchModule {
 
     /// App blocking / Focus mode is on only while a focus phase is actually running.
     private func syncFocusGuard() {
-        FocusGuard.shared.setActive(isEnabled && phase == .work && isRunning)
+        FocusGuard.shared.setActive(isEnabled && phase == .work && isRunning, until: endDate)
     }
 
     // MARK: Stats

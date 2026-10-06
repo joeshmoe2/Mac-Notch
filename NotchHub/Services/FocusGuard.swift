@@ -5,8 +5,8 @@ extension Prefs {
     static let focusBlockApps = PrefKey("pomodoro.blockApps", false)
     /// Comma separated bundle identifiers.
     static let focusBlockedApps = PrefKey("pomodoro.blockedApps", "")
-    /// "hide" or "quit".
-    static let focusBlockAction = PrefKey("pomodoro.blockAction", "hide")
+    /// "shield" (full-screen block screen), "hide" or "quit".
+    static let focusBlockAction = PrefKey("pomodoro.blockAction", "shield")
     static let focusUseFocusMode = PrefKey("pomodoro.useFocusMode", false)
     static let focusOnShortcut = PrefKey("pomodoro.focusOnShortcut", "NotchHub Focus On")
     static let focusOffShortcut = PrefKey("pomodoro.focusOffShortcut", "NotchHub Focus Off")
@@ -47,6 +47,8 @@ final class FocusGuard {
     /// Most recently blocked app name, shown in the Pomodoro UI.
     private(set) var lastBlockedName: String?
     private(set) var shortcutError: String?
+    /// When the current focus phase ends (shown on the block screen).
+    private(set) var sessionEnd: Date?
 
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var lastNotified: [String: Date] = [:]
@@ -88,7 +90,8 @@ final class FocusGuard {
     // MARK: Session
 
     /// Called by the Pomodoro module whenever its state changes.
-    func setActive(_ active: Bool) {
+    func setActive(_ active: Bool, until end: Date? = nil) {
+        sessionEnd = active ? end : nil
         guard active != isActive else { return }
         isActive = active
         if active {
@@ -96,10 +99,15 @@ final class FocusGuard {
                 startObserving()
                 enforceOnRunningApps()
             }
+            if Prefs.focusBlockWebsites.value { WebsiteBlocker.shared.apply(blocking: true) }
             if Prefs.focusUseFocusMode.value { runShortcut(Prefs.focusOnShortcut.value) }
         } else {
             stopObserving()
             lastBlockedName = nil
+            FocusShield.shared.dismiss()
+            if Prefs.focusBlockWebsites.value || WebsiteBlocker.shared.isBlocking {
+                WebsiteBlocker.shared.apply(blocking: false)
+            }
             if Prefs.focusUseFocusMode.value { runShortcut(Prefs.focusOffShortcut.value) }
         }
     }
@@ -112,7 +120,9 @@ final class FocusGuard {
             enforceOnRunningApps()
         } else {
             stopObserving()
+            FocusShield.shared.dismiss()
         }
+        WebsiteBlocker.shared.apply(blocking: Prefs.focusBlockWebsites.value)
     }
 
     /// Synchronous version for app termination so the Focus doesn't stay on.
@@ -120,6 +130,7 @@ final class FocusGuard {
         guard isActive else { return }
         isActive = false
         stopObserving()
+        if WebsiteBlocker.shared.isBlocking { WebsiteBlocker.shared.apply(blocking: false, wait: true) }
         if Prefs.focusUseFocusMode.value {
             runShortcut(Prefs.focusOffShortcut.value, wait: true)
         }
@@ -154,13 +165,19 @@ final class FocusGuard {
         guard isActive, Prefs.focusBlockApps.value,
               let id = app.bundleIdentifier,
               Prefs.focusBlockedApps.value.idList.contains(id) else { return }
-        if Prefs.focusBlockAction.value == "quit" {
-            app.terminate()
-        } else {
-            app.hide()
-        }
         let name = app.localizedName ?? id
         lastBlockedName = name
+        switch Prefs.focusBlockAction.value {
+        case "quit":
+            app.terminate()
+        case "hide":
+            app.hide()
+        default:
+            // Block screen: hide the app and cover the screen with a reminder.
+            app.hide()
+            FocusShield.shared.show(appName: name, icon: app.icon)
+            return
+        }
         // Tell the user why, at most once a minute per app.
         if notify, Date.now.timeIntervalSince(lastNotified[id] ?? .distantPast) > 60 {
             lastNotified[id] = .now

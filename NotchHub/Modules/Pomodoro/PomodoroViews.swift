@@ -115,9 +115,10 @@ private struct FocusGuardStatus: View {
     private var guardian: FocusGuard { .shared }
     @AppStorage(Prefs.focusBlockApps) private var blockApps
     @AppStorage(Prefs.focusUseFocusMode) private var useFocusMode
+    @AppStorage(Prefs.focusBlockWebsites) private var blockWebsites
 
     var body: some View {
-        if guardian.isActive, blockApps || useFocusMode {
+        if guardian.isActive, blockApps || useFocusMode || blockWebsites {
             VStack(alignment: .leading, spacing: 2) {
                 Label(statusText, systemImage: "shield.lefthalf.filled")
                     .font(.caption.weight(.semibold))
@@ -134,6 +135,10 @@ private struct FocusGuardStatus: View {
         if blockApps {
             let count = guardian.blockedApps.count
             parts.append("Blocking \(count) app\(count == 1 ? "" : "s")")
+        }
+        if blockWebsites {
+            let count = WebsiteBlocker.shared.domains.count
+            parts.append("\(count) site\(count == 1 ? "" : "s")")
         }
         if useFocusMode { parts.append("Focus on") }
         return parts.joined(separator: " · ")
@@ -173,12 +178,15 @@ struct FocusBlockingSettings: View {
             }
             Button("Add Apps…") { guardian.runAddAppPanel() }
             Picker("When a blocked app opens", selection: $blockAction) {
+                Text("Show block screen").tag("shield")
                 Text("Hide it").tag("hide")
                 Text("Quit it").tag("quit")
             }
             Text("Blocking applies only while a focus phase is running (not during breaks or while paused).")
                 .font(.caption).foregroundStyle(.secondary)
         }
+
+        WebsiteBlockingSettings()
 
         Toggle("Silence notifications with a Focus mode", isOn: $useFocusMode)
         if useFocusMode {
@@ -197,5 +205,63 @@ struct FocusBlockingSettings: View {
                 Text(error).font(.caption).foregroundStyle(.orange)
             }
         }
+    }
+}
+
+/// Settings rows for blocking websites during focus sessions.
+struct WebsiteBlockingSettings: View {
+    @AppStorage(Prefs.focusBlockWebsites) private var blockWebsites
+    @AppStorage(Prefs.focusBlockedSites) private var sites
+    @State private var draft = ""
+    @State private var invalid = false
+    private var blocker: WebsiteBlocker { .shared }
+
+    var body: some View {
+        Toggle("Block websites during focus", isOn: $blockWebsites)
+            .onChange(of: blockWebsites) { FocusGuard.shared.blockingSettingChanged() }
+        if blockWebsites {
+            if !blocker.isInstalled {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Website blocking needs a one-time setup. You'll be asked for your Mac password once; NotchHub then installs a small helper that can only add or remove its own list of blocked sites.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Install Website Blocker…") { blocker.install() }
+                }
+            }
+            ForEach(sites.idList, id: \.self) { domain in
+                HStack {
+                    Image(systemName: "globe").foregroundStyle(.secondary)
+                    Text(domain)
+                    Spacer()
+                    Button {
+                        blocker.removeSite(domain)
+                    } label: {
+                        Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            HStack {
+                TextField("Add a site", text: $draft, prompt: Text("e.g. youtube.com"))
+                    .onSubmit(add)
+                Button("Add", action: add).disabled(draft.isEmpty)
+            }
+            if invalid {
+                Text("That doesn't look like a website address.").font(.caption).foregroundStyle(.orange)
+            }
+            Text("Blocks the site and its www. and m. versions in every browser. Tabs that are already open may keep working until you reload, and some browsers cache addresses for a minute.")
+                .font(.caption).foregroundStyle(.secondary)
+            if let error = blocker.lastError {
+                Text(error).font(.caption).foregroundStyle(.orange)
+            }
+            if blocker.isInstalled {
+                Button("Uninstall Website Blocker…", role: .destructive) { blocker.uninstall() }
+                    .font(.caption)
+            }
+        }
+    }
+
+    private func add() {
+        invalid = !blocker.addSite(draft)
+        if !invalid { draft = "" }
     }
 }
