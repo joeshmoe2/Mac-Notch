@@ -19,6 +19,7 @@ final class AppState {
             TimerModule(),
             PomodoroModule(),
             NotesModule(),
+            ShelfModule(),
         ]
     }
 
@@ -29,7 +30,9 @@ final class AppState {
     /// Routes files dropped anywhere on the notch. Returns true if handled.
     @discardableResult
     func receiveDroppedFiles(_ urls: [URL]) -> Bool {
-        false
+        guard !urls.isEmpty, registry.isEnabled(ShelfModuleID), let shelf = module(ShelfModule.self) else { return false }
+        shelf.add(urls)
+        return true
     }
 
     func module<M: NotchModule>(_ type: M.Type) -> M? {

@@ -46,6 +46,7 @@ struct NotchRootView: View {
         .environment(\.notchNamespace, namespace)
         .environment(\.notchExpanded, expanded)
         .environment(\.notchFontSize, fontSize)
+        .environment(\.notchActions, controller)
     }
 
     private var notch: some View {
