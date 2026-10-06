@@ -32,7 +32,9 @@ struct NotesExpandedView: View {
                                 Button(note.id == module.pinnedID ? "Unpin from Home" : "Pin to Home") {
                                     module.setPinned(note.id == module.pinnedID ? nil : note.id)
                                 }
-                                Button("Delete", role: .destructive) { module.delete(note.id) }
+                                Button("Open in NotchNotes") { module.openInCompanion(note) }
+                                Button("Show in Finder") { module.store.revealInFinder(note) }
+                                Button("Move to Trash", role: .destructive) { module.delete(note.id) }
                             }
                     }
                 }
@@ -60,7 +62,8 @@ struct NotesExpandedView: View {
                     IconButton(icon: note.id == module.pinnedID ? "pin.fill" : "pin", size: 10, help: "Pin to Home") {
                         module.setPinned(note.id == module.pinnedID ? nil : note.id)
                     }
-                    IconButton(icon: "trash", size: 10, help: "Delete note") { module.delete(note.id) }
+                    IconButton(icon: "macwindow", size: 10, help: "Open in NotchNotes") { module.openInCompanion(note) }
+                    IconButton(icon: "trash", size: 10, help: "Move to Trash") { module.delete(note.id) }
                 }
                 if checklistMode {
                     ChecklistView(note: note) { line in module.toggleCheckbox(noteID: note.id, line: line) }
@@ -104,42 +107,6 @@ private struct NoteListRow: View {
     }
 }
 
-/// Renders a note with clickable markdown-style checkboxes.
-struct ChecklistView: View {
-    let note: Note
-    var compact = false
-    let onToggle: (Int) -> Void
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: compact ? 2 : 4) {
-                ForEach(NoteLine.parse(note.body)) { line in
-                    switch line.kind {
-                    case .text:
-                        if !line.text.isEmpty || !compact {
-                            Text(line.text.isEmpty ? " " : line.text)
-                        }
-                    case .unchecked, .checked:
-                        Button {
-                            onToggle(line.id)
-                        } label: {
-                            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                Image(systemName: line.kind == .checked ? "checkmark.square.fill" : "square")
-                                    .foregroundStyle(line.kind == .checked ? Color.accentColor : .secondary)
-                                Text(line.text)
-                                    .strikethrough(line.kind == .checked)
-                                    .foregroundStyle(line.kind == .checked ? .secondary : .primary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
 struct NotesCompactView: View {
     let module: NotesModule
 
@@ -170,13 +137,12 @@ struct NotesSettingsView: View {
             get: { module.pinnedID },
             set: { module.setPinned($0) }
         )) {
-            Text("Most recent").tag(UUID?.none)
-            ForEach(module.notes) { note in Text(note.title).tag(UUID?.some(note.id)) }
+            Text("Most recent").tag(NoteID?.none)
+            ForEach(module.notes) { note in Text(note.title).tag(NoteID?.some(note.id)) }
         }
-        LabeledContent("Storage") {
-            Button("Show in Finder") {
-                NSWorkspace.shared.activateFileViewerSelecting([JSONStore.url(for: "notes.json")])
-            }
+        NotesFolderSettings(store: module.store)
+        LabeledContent("Companion app") {
+            Button("Open NotchNotes") { module.openInCompanion(nil) }
         }
         Text("Tip: start a line with \"- [ ] \" to make a checkbox.").font(.caption).foregroundStyle(.secondary)
     }

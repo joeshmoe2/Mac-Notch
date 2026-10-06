@@ -1,0 +1,181 @@
+import AppKit
+import SwiftUI
+
+struct ContentView: View {
+    @Bindable var model: NotesAppModel
+
+    var body: some View {
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 360)
+        } detail: {
+            if let note = model.selectedNote {
+                NoteEditor(model: model, note: note)
+                    .id(note.id)
+            } else {
+                ContentUnavailableView {
+                    Label("No Note Selected", systemImage: "note.text")
+                } description: {
+                    Text("Pick a note on the left or press ⌘N to start a new one.")
+                } actions: {
+                    Button("New Note") { model.newNote() }
+                }
+            }
+        }
+        .searchable(text: $model.searchText, placement: .sidebar, prompt: "Search notes")
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.appDidBecomeActive()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            model.store.flushSaves()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
+            // Save right away when switching apps so NotchHub sees the latest text.
+            model.store.flushSaves()
+        }
+    }
+
+    private var sidebar: some View {
+        List(selection: $model.selection) {
+            ForEach(model.filteredNotes) { note in
+                NoteRow(note: note)
+                    .tag(note.id)
+                    .contextMenu {
+                        Button("Show in Finder") { model.store.revealInFinder(note) }
+                        Divider()
+                        Button("Move to Trash", role: .destructive) {
+                            model.selection = note.id
+                            model.deleteSelected()
+                        }
+                    }
+            }
+        }
+        .overlay {
+            if model.filteredNotes.isEmpty {
+                Text(model.searchText.isEmpty ? "No notes yet" : "No matches")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .toolbar {
+            ToolbarItem {
+                Button { model.newNote() } label: {
+                    Label("New Note", systemImage: "square.and.pencil")
+                }
+                .help("New Note (⌘N)")
+            }
+        }
+    }
+}
+
+private struct NoteRow: View {
+    let note: Note
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(note.title)
+                .font(.headline)
+                .lineLimit(1)
+            HStack(spacing: 6) {
+                Text(note.updatedAt, format: .relative(presentation: .named))
+                    .foregroundStyle(.secondary)
+                Text(note.preview.isEmpty ? "No additional text" : note.preview)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            .font(.caption)
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+private struct NoteEditor: View {
+    @Bindable var model: NotesAppModel
+    let note: Note
+    @AppStorage("editorFontSize") private var fontSize = 15.0
+    @AppStorage("editorMonospaced") private var monospaced = false
+
+    private var store: NotesStore { model.store }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if model.checklistMode {
+                ChecklistView(note: note) { line in store.toggleCheckbox(note.id, line: line) }
+                    .font(.system(size: fontSize))
+                    .padding(20)
+            } else {
+                TextEditor(text: Binding(
+                    get: { store.note(id: note.id)?.body ?? "" },
+                    set: { store.update(note.id, body: $0) }
+                ))
+                .font(monospaced ? .system(size: fontSize, design: .monospaced) : .system(size: fontSize))
+                .scrollContentBackground(.hidden)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+            }
+            Divider()
+            footer
+        }
+        .background(Color(nsColor: .textBackgroundColor))
+        .navigationTitle(note.title)
+        .navigationSubtitle(note.fileName)
+        .toolbar {
+            ToolbarItemGroup {
+                Button { model.insertCheckbox() } label: {
+                    Label("Insert Checkbox", systemImage: "checklist")
+                }
+                .help("Insert Checkbox (⇧⌘L)")
+                Toggle(isOn: $model.checklistMode) {
+                    Label("Checklist View", systemImage: "checkmark.square")
+                }
+                .help("Toggle checklist view (⇧⌘K)")
+                ShareLink(item: store.url(for: note.fileName)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                Button { store.revealInFinder(note) } label: {
+                    Label("Show in Finder", systemImage: "folder")
+                }
+                Button(role: .destructive) { model.deleteSelected() } label: {
+                    Label("Move to Trash", systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private var footer: some View {
+        HStack {
+            Text("\(note.wordCount) word\(note.wordCount == 1 ? "" : "s")")
+            Spacer()
+            Text("Edited \(note.updatedAt.formatted(date: .abbreviated, time: .shortened))")
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+}
+
+struct NotchNotesSettings: View {
+    let model: NotesAppModel
+    @AppStorage("editorFontSize") private var fontSize = 15.0
+    @AppStorage("editorMonospaced") private var monospaced = false
+
+    var body: some View {
+        Form {
+            Section("Storage") {
+                NotesFolderSettings(store: model.store)
+            }
+            Section("Editor") {
+                LabeledContent("Font size") {
+                    HStack {
+                        Slider(value: $fontSize, in: 11...24, step: 1)
+                        Text("\(Int(fontSize)) pt").monospacedDigit().frame(width: 44, alignment: .trailing)
+                    }
+                }
+                Toggle("Monospaced font", isOn: $monospaced)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 520)
+        .padding(.vertical, 8)
+    }
+}

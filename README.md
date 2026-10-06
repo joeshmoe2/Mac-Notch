@@ -6,7 +6,7 @@ Move the cursor onto the notch and it springs open into a panel with tabs for:
 
 - **Timer**: run several timers at once.
 - **Pomodoro**: focus and break cycles. During focus it can show a full-screen block screen over distracting apps, block websites, and turn on a Focus (Do Not Disturb).
-- **Notes**: quick notes, with checklists.
+- **Notes**: quick notes with checklists, saved as Markdown files you can see in Finder. They're shared with **NotchNotes**, a full-window companion app (see below).
 - **File Shelf**: a temporary drop zone for files.
 - **Weather**: current conditions and an hourly forecast.
 - **Now Playing**: Music and Spotify controls, volume and output device.
@@ -37,6 +37,19 @@ The CI workflow `.github/workflows/build.yml` builds the project on a macOS runn
 NotchHub is an agent app (`LSUIElement`), so it has **no Dock icon**. Use the menu bar icon (▭) to toggle the notch, open Settings, or quit. The default global shortcut is **⌥⌘N**.
 
 ---
+
+## NotchNotes (companion app)
+
+NotchNotes is a regular windowed note-taking app built from the same project (scheme **NotchNotes**). It reads and writes the same notes as the notch's Notes module.
+
+- **Storage**: every note is a Markdown file (`.md`) in `~/Documents/NotchHub Notes/` by default. You can change the folder in either app's settings (Settings → Notes in NotchHub, ⌘, in NotchNotes) and both apps follow. Put it in iCloud Drive to sync between Macs, or open the files in any editor.
+- **File names follow the note's first line.** Deleting a note moves its file to the Trash.
+- **Live sync**: both apps watch the folder, so edits in one show up in the other within a moment. Changes made in other editors appear too.
+- **Features**: sidebar with search, a large editor, a checklist view (⇧⌘K), insert checkbox (⇧⌘L), word count, share and Show in Finder.
+- In the notch, the window button above a note (or "Open in NotchNotes" in its right-click menu) opens that note in NotchNotes.
+- The first time NotchHub starts after this update, notes from the old `notes.json` are converted to files automatically (the old file is kept as `notes.json.migrated`).
+
+To build it, choose the **NotchNotes** scheme and press ⌘R, or archive it like NotchHub and copy `NotchNotes.app` to Applications.
 
 ## Permissions, entitlements and Info.plist keys
 
@@ -92,6 +105,9 @@ NotchHub/
 ├── Models/              CountdownTimer, Note, ShelfItem, WeatherModels, JSONStore
 ├── Settings/            Preferences (typed UserDefaults keys), SettingsView, SettingsTransfer
 └── Resources/           Assets
+Shared/                  Code compiled into both apps: Note, NotesStore (Markdown files + folder watching),
+                         ChecklistView, NotesFolderSettings
+NotchNotes/              The companion app: NotchNotesApp, ContentView, Assets
 ```
 
 ### Key design decisions
@@ -119,7 +135,7 @@ NotchHub/
   - Every setting is a typed `PrefKey` (namespaced `nh.*`) used through `@AppStorage(Prefs.someKey)` in views, or `Prefs.someKey.value` in non-view code.
   - Export, import and reset work generically on the `nh.` prefix.
   - Module choices (order, enabled, Home, live-activity priority) are persisted by `ModuleRegistry`.
-- **Data.** Notes, shelf items and the weather cache are JSON files in `~/Library/Application Support/NotchHub/`.
+- **Data.** Notes are Markdown files in a user-chosen folder (default `~/Documents/NotchHub Notes/`). The notes folder location is kept in the shared preferences domain `com.notchhub.shared`, so both apps agree on it. Shelf items and the weather cache are JSON files in `~/Library/Application Support/NotchHub/`.
 
 ---
 
