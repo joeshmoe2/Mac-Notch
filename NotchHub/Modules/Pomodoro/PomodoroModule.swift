@@ -90,6 +90,7 @@ final class PomodoroModule: NotchModule {
         hasStarted = true
         endDate = .now.addingTimeInterval(pausedRemaining)
         schedulePhaseEnd()
+        syncFocusGuard()
     }
 
     func pause() {
@@ -97,6 +98,7 @@ final class PomodoroModule: NotchModule {
         pausedRemaining = remaining()
         endDate = nil
         phaseTask?.cancel()
+        syncFocusGuard()
     }
 
     func toggle() { isRunning ? pause() : start() }
@@ -114,6 +116,7 @@ final class PomodoroModule: NotchModule {
         endDate = nil
         hasStarted = false
         pausedRemaining = phaseDuration
+        syncFocusGuard()
     }
 
     /// Re-reads durations after settings change (only affects idle phases).
@@ -167,6 +170,12 @@ final class PomodoroModule: NotchModule {
         if (countCompleted && Prefs.pomodoroAutoStart.value) || (!countCompleted && wasRunning) {
             start()
         }
+        syncFocusGuard()
+    }
+
+    /// App blocking / Focus mode is on only while a focus phase is actually running.
+    private func syncFocusGuard() {
+        FocusGuard.shared.setActive(isEnabled && phase == .work && isRunning)
     }
 
     // MARK: Stats
@@ -189,6 +198,10 @@ final class PomodoroModule: NotchModule {
     }
 
     // MARK: NotchModule
+
+    func setActive(_ active: Bool) {
+        if !active { FocusGuard.shared.setActive(false) }
+    }
 
     func willExpand() {
         loadStats()

@@ -32,6 +32,7 @@ struct PomodoroExpandedView: View {
                 Label("\(module.completedToday) focus session\(module.completedToday == 1 ? "" : "s") today",
                       systemImage: "checkmark.seal.fill")
                     .foregroundStyle(.secondary)
+                FocusGuardStatus()
 
                 HStack(spacing: 8) {
                     Button(action: module.toggle) {
@@ -101,9 +102,100 @@ struct PomodoroSettingsView: View {
             ForEach(NotificationService.soundNames, id: \.self) { Text($0).tag($0) }
         }
         .disabled(!sound)
+        FocusBlockingSettings()
         NotificationPermissionRow()
             .onChange(of: work) { module.applySettings() }
             .onChange(of: shortBreak) { module.applySettings() }
             .onChange(of: longBreak) { module.applySettings() }
+    }
+}
+
+/// Small "Blocking 3 apps" line shown during a focus session.
+private struct FocusGuardStatus: View {
+    private var guardian: FocusGuard { .shared }
+    @AppStorage(Prefs.focusBlockApps) private var blockApps
+    @AppStorage(Prefs.focusUseFocusMode) private var useFocusMode
+
+    var body: some View {
+        if guardian.isActive, blockApps || useFocusMode {
+            VStack(alignment: .leading, spacing: 2) {
+                Label(statusText, systemImage: "shield.lefthalf.filled")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PomodoroPhase.work.color)
+                if let name = guardian.lastBlockedName {
+                    Text("Blocked \(name)").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var statusText: String {
+        var parts: [String] = []
+        if blockApps {
+            let count = guardian.blockedApps.count
+            parts.append("Blocking \(count) app\(count == 1 ? "" : "s")")
+        }
+        if useFocusMode { parts.append("Focus on") }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// Settings rows for app blocking and Focus (Do Not Disturb) during focus sessions.
+struct FocusBlockingSettings: View {
+    @AppStorage(Prefs.focusBlockApps) private var blockApps
+    @AppStorage(Prefs.focusBlockedApps) private var blockedIDs
+    @AppStorage(Prefs.focusBlockAction) private var blockAction
+    @AppStorage(Prefs.focusUseFocusMode) private var useFocusMode
+    @AppStorage(Prefs.focusOnShortcut) private var onShortcut
+    @AppStorage(Prefs.focusOffShortcut) private var offShortcut
+    private var guardian: FocusGuard { .shared }
+
+    var body: some View {
+        Toggle("Block distracting apps during focus", isOn: $blockApps)
+            .onChange(of: blockApps) { guardian.blockingSettingChanged() }
+        if blockApps {
+            let apps = blockedIDs.idList.map(BlockableApp.init(bundleID:))
+            if apps.isEmpty {
+                Text("No apps blocked yet.").foregroundStyle(.secondary)
+            }
+            ForEach(apps) { app in
+                HStack {
+                    Image(nsImage: app.icon).resizable().frame(width: 18, height: 18)
+                    Text(app.name)
+                    Spacer()
+                    Button {
+                        guardian.removeApp(app.bundleID)
+                    } label: {
+                        Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Button("Add Apps…") { guardian.runAddAppPanel() }
+            Picker("When a blocked app opens", selection: $blockAction) {
+                Text("Hide it").tag("hide")
+                Text("Quit it").tag("quit")
+            }
+            Text("Blocking applies only while a focus phase is running (not during breaks or while paused).")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+
+        Toggle("Silence notifications with a Focus mode", isOn: $useFocusMode)
+        if useFocusMode {
+            TextField("Shortcut to turn Focus on", text: $onShortcut)
+            TextField("Shortcut to turn Focus off", text: $offShortcut)
+            Text("""
+            macOS doesn't let apps switch Focus directly, so NotchHub runs two Shortcuts. In the Shortcuts app, create             "\(onShortcut)" with the action Set Focus → Do Not Disturb → On, and "\(offShortcut)" with Set Focus → Off.             To still see NotchHub's own "focus complete" alerts, allow NotchHub in that Focus's settings.
+            """)
+            .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("Open Shortcuts") { guardian.openShortcutsApp() }
+                Button("Test On") { guardian.runShortcut(onShortcut) }
+                Button("Test Off") { guardian.runShortcut(offShortcut) }
+            }
+            if let error = guardian.shortcutError {
+                Text(error).font(.caption).foregroundStyle(.orange)
+            }
+        }
     }
 }
