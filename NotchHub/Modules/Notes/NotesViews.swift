@@ -1,0 +1,183 @@
+import SwiftUI
+
+struct NotesExpandedView: View {
+    @Bindable var module: NotesModule
+    @State private var checklistMode = false
+    @AppStorage(Prefs.notesMonospaced) private var monospaced
+    @Environment(\.notchFontSize) private var fontSize
+
+    var body: some View {
+        HStack(spacing: 10) {
+            sidebar.frame(width: 150)
+            Divider().overlay(Color.white.opacity(0.1))
+            editor
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer()
+                IconButton(icon: "plus", size: 10, help: "New note") { module.newNote() }
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(module.notes) { note in
+                        NoteListRow(note: note,
+                                    selected: note.id == module.selectedID,
+                                    pinned: note.id == module.pinnedID)
+                            .onTapGesture { module.selectedID = note.id }
+                            .contextMenu {
+                                Button(note.id == module.pinnedID ? "Unpin from Home" : "Pin to Home") {
+                                    module.setPinned(note.id == module.pinnedID ? nil : note.id)
+                                }
+                                Button("Delete", role: .destructive) { module.delete(note.id) }
+                            }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        if let note = module.selected {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Text(note.updatedAt, style: .relative).font(.caption2).foregroundStyle(.secondary)
+                    + Text(" ago").font(.caption2).foregroundStyle(.secondary)
+                    Spacer()
+                    IconButton(icon: "checklist", size: 10, help: "Insert checkbox") {
+                        let body = note.body.isEmpty || note.body.hasSuffix("\n") ? note.body + "- [ ] " : note.body + "\n- [ ] "
+                        module.update(note.id, body: body)
+                        checklistMode = false
+                    }
+                    IconButton(icon: checklistMode ? "pencil" : "checkmark.square", size: 10,
+                               help: checklistMode ? "Edit text" : "Checklist view") {
+                        checklistMode.toggle()
+                    }
+                    IconButton(icon: note.id == module.pinnedID ? "pin.fill" : "pin", size: 10, help: "Pin to Home") {
+                        module.setPinned(note.id == module.pinnedID ? nil : note.id)
+                    }
+                    IconButton(icon: "trash", size: 10, help: "Delete note") { module.delete(note.id) }
+                }
+                if checklistMode {
+                    ChecklistView(note: note) { line in module.toggleCheckbox(noteID: note.id, line: line) }
+                } else {
+                    TextEditor(text: Binding(
+                        get: { module.selected?.body ?? "" },
+                        set: { module.update(note.id, body: $0) }
+                    ))
+                    .font(monospaced ? .system(size: fontSize, design: .monospaced) : .system(size: fontSize))
+                    .scrollContentBackground(.hidden)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
+                }
+            }
+            .id(note.id)
+        } else {
+            VStack(spacing: 8) {
+                Text("No note selected").foregroundStyle(.secondary)
+                Button("New Note") { module.newNote() }.buttonStyle(PillButtonStyle(prominent: true))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
+private struct NoteListRow: View {
+    let note: Note
+    let selected: Bool
+    let pinned: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if pinned { Image(systemName: "pin.fill").font(.system(size: 8)).foregroundStyle(.secondary) }
+            Text(note.title).lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.accentColor.opacity(0.5) : .clear))
+        .contentShape(Rectangle())
+    }
+}
+
+/// Renders a note with clickable markdown-style checkboxes.
+struct ChecklistView: View {
+    let note: Note
+    var compact = false
+    let onToggle: (Int) -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: compact ? 2 : 4) {
+                ForEach(NoteLine.parse(note.body)) { line in
+                    switch line.kind {
+                    case .text:
+                        if !line.text.isEmpty || !compact {
+                            Text(line.text.isEmpty ? " " : line.text)
+                        }
+                    case .unchecked, .checked:
+                        Button {
+                            onToggle(line.id)
+                        } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Image(systemName: line.kind == .checked ? "checkmark.square.fill" : "square")
+                                    .foregroundStyle(line.kind == .checked ? Color.accentColor : .secondary)
+                                Text(line.text)
+                                    .strikethrough(line.kind == .checked)
+                                    .foregroundStyle(line.kind == .checked ? .secondary : .primary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+struct NotesCompactView: View {
+    let module: NotesModule
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            let note = module.pinned ?? module.notes.first
+            ModuleTileHeader(icon: module.pinned != nil ? "pin.fill" : "note.text",
+                             title: note?.title ?? "Notes")
+            if let note {
+                ChecklistView(note: note, compact: true) { line in
+                    module.toggleCheckbox(noteID: note.id, line: line)
+                }
+                .font(.system(size: 11))
+            } else {
+                Text("No notes yet").foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct NotesSettingsView: View {
+    let module: NotesModule
+    @AppStorage(Prefs.notesMonospaced) private var monospaced
+
+    var body: some View {
+        Toggle("Monospaced font", isOn: $monospaced)
+        Picker("Pinned note on Home", selection: Binding(
+            get: { module.pinnedID },
+            set: { module.setPinned($0) }
+        )) {
+            Text("Most recent").tag(UUID?.none)
+            ForEach(module.notes) { note in Text(note.title).tag(UUID?.some(note.id)) }
+        }
+        LabeledContent("Storage") {
+            Button("Show in Finder") {
+                NSWorkspace.shared.activateFileViewerSelecting([JSONStore.url(for: "notes.json")])
+            }
+        }
+        Text("Tip: start a line with \"- [ ] \" to make a checkbox.").font(.caption).foregroundStyle(.secondary)
+    }
+}

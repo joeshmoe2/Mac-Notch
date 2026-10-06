@@ -18,6 +18,7 @@ final class AppState {
         [
             TimerModule(),
             PomodoroModule(),
+            NotesModule(),
         ]
     }
 
