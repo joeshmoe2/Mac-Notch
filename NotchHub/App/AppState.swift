@@ -20,6 +20,7 @@ final class AppState {
             PomodoroModule(),
             NotesModule(),
             ShelfModule(),
+            WeatherModule(),
         ]
     }
 
