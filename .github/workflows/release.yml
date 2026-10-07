@@ -1,0 +1,131 @@
+name: Release
+
+# Builds a Release configuration and packages NotchHub + NotchNotes into a .dmg.
+# - With Developer ID secrets: signs, notarizes and staples.
+# - Without them: produces an ad-hoc signed (unsigned for distribution) build.
+#
+# Secrets (all optional; all must be set to sign):
+#   DEVELOPER_ID_CERT_P12      base64 of your "Developer ID Application" certificate + key (.p12)
+#   DEVELOPER_ID_CERT_PASSWORD password for that .p12
+#   APPLE_TEAM_ID              your 10-character Team ID
+#   APPLE_ID                   Apple ID email used for notarization
+#   APPLE_APP_PASSWORD         app-specific password for that Apple ID (appleid.apple.com)
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    # Also run when the release workflow itself changes, so edits get tested.
+    paths: [".github/workflows/release.yml"]
+
+jobs:
+  release:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_ID_CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+      DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Decide signing mode
+        id: mode
+        run: |
+          if [ -n "$DEVELOPER_ID_CERT_P12" ] && [ -n "$DEVELOPER_ID_CERT_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ] \
+             && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_PASSWORD" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "Developer ID secrets found: building a signed, notarized release."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "No Developer ID secrets: building an unsigned (ad-hoc) release."
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          [ "$GITHUB_REF_TYPE" = "tag" ] || VERSION="$(date +%Y.%m.%d)-${GITHUB_SHA::7}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Import Developer ID certificate
+        if: steps.mode.outputs.signed == 'true'
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$DEVELOPER_ID_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$DEVELOPER_ID_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+
+      - name: Build (Release, universal)
+        run: |
+          set -o pipefail
+          SIGNING_ARGS=()
+          if [ "${{ steps.mode.outputs.signed }}" = "true" ]; then
+            SIGNING_ARGS=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Developer ID Application"
+                          DEVELOPMENT_TEAM="$APPLE_TEAM_ID" OTHER_CODE_SIGN_FLAGS=--timestamp)
+          else
+            # Ad-hoc signature: required to run at all on Apple silicon, but not trusted by Gatekeeper.
+            SIGNING_ARGS=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=)
+          fi
+          xcodebuild \
+            -project NotchHub.xcodeproj \
+            -scheme NotchHub \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build \
+            ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO \
+            ENABLE_HARDENED_RUNTIME=YES \
+            "${SIGNING_ARGS[@]}" \
+            build 2>&1 | tee release-build.log | grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" release-build.log
+
+      - name: Verify app bundle
+        run: |
+          APP=build/Build/Products/Release/NotchHub.app
+          test -d "$APP/Contents/Helpers/NotchNotes.app"
+          lipo -archs "$APP/Contents/MacOS/NotchHub"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv --verbose=2 "$APP" 2>&1 | grep -E "Authority|Signature|TeamIdentifier" || true
+
+      - name: Create .dmg
+        run: |
+          STAGING="$RUNNER_TEMP/dmg"
+          mkdir -p "$STAGING"
+          cp -R build/Build/Products/Release/NotchHub.app "$STAGING/"
+          # NotchNotes is also embedded in NotchHub; a standalone copy makes it easy to drag to Applications.
+          cp -R build/Build/Products/Release/NotchHub.app/Contents/Helpers/NotchNotes.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          DMG="NotchHub-${{ steps.mode.outputs.version }}.dmg"
+          hdiutil create -volname "NotchHub" -srcfolder "$STAGING" -ov -format UDZO "$DMG"
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Sign, notarize and staple the .dmg
+        if: steps.mode.outputs.signed == 'true'
+        run: |
+          codesign --sign "Developer ID Application" --timestamp "$DMG"
+          xcrun notarytool submit "$DMG" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" \
+            --wait
+          xcrun stapler staple "$DMG"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+
+      - name: Upload .dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: NotchHub-${{ steps.mode.outputs.version }}${{ steps.mode.outputs.signed == 'true' && '' || '-unsigned' }}
+          path: ${{ env.DMG }}
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-log
+          path: release-build.log
+
+      - name: Clean up keychain
+        if: always() && steps.mode.outputs.signed == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
