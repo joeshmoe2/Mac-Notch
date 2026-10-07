@@ -26,6 +26,7 @@ final class AppState {
             RemindersModule(),
             ClipboardModule(),
             CameraModule(),
+            QuickActionsModule(),
         ]
     }
 
