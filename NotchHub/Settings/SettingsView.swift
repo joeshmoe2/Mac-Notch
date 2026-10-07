@@ -74,6 +74,11 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
+            Section("Welcome") {
+                LabeledContent("Introduction and permissions") {
+                    Button("Show Onboarding Again") { OnboardingWindowController.shared.show() }
+                }
+            }
             Section("Startup") {
                 Toggle("Launch at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, enabled in setLaunchAtLogin(enabled) }

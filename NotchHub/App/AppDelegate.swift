@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WebsiteBlocker.shared.cleanUpOnLaunch()
         SharedAccent.publish(Prefs.accentColor.value)
         lastDisplaySignature = displaySignature
+        // First run: welcome + permissions, one at a time.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            MainActor.assumeIsolated { OnboardingWindowController.shared.showIfNeeded() }
+        }
 
         // React to settings changes (from the Settings window, import or reset).
         defaultsObserver = NotificationCenter.default.addObserver(
