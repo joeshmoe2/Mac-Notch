@@ -170,6 +170,8 @@ struct BehaviorSettingsView: View {
     @AppStorage(Prefs.openOnClick) private var openOnClick
     @AppStorage(Prefs.rememberLastTab) private var rememberLastTab
     @AppStorage(Prefs.popupCharger) private var popupCharger
+    @AppStorage(Prefs.gestureSwipeTabs) private var swipeTabs
+    @AppStorage(Prefs.gestureScrollVolume) private var scrollVolume
     @AppStorage(Prefs.popupHeadphones) private var popupHeadphones
     @AppStorage(Prefs.popupDuration) private var popupDuration
 
@@ -189,6 +191,10 @@ struct BehaviorSettingsView: View {
             }
             Section("Tabs") {
                 Toggle("Reopen on the last used tab", isOn: $rememberLastTab)
+            }
+            Section("Gestures") {
+                Toggle("Swipe left or right with two fingers to switch tabs", isOn: $swipeTabs)
+                Toggle("Scroll over the closed notch to change the volume", isOn: $scrollVolume)
             }
             Section("Pop-ups") {
                 Toggle("Show battery when the charger is connected or removed", isOn: $popupCharger)

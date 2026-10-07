@@ -5,11 +5,16 @@ extension Prefs {
     static let popupHeadphones = PrefKey("popups.headphones", true)
     /// Seconds a pop-up stays open.
     static let popupDuration = PrefKey("popups.duration", 3.0)
+    // Gestures
+    static let gestureSwipeTabs = PrefKey("behavior.swipeTabs", true)
+    static let gestureScrollVolume = PrefKey("behavior.scrollVolume", true)
 }
 
 /// Content of a brief notch pop-up.
 struct NotchPopup: Equatable {
-    let id = UUID()
+    var id = UUID()
+    /// Pop-ups of the same kind (e.g. "volume") update in place instead of re-animating.
+    var kind: String?
     var icon: String
     var iconColor: Color
     var title: String

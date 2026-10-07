@@ -133,6 +133,71 @@ final class NotchWindowController {
         panel.ignoresMouseEvents = true
     }
 
+    // MARK: Gestures
+
+    private var swipeAccumulator: CGFloat = 0
+    private var swipeHandled = false
+
+    /// Two-finger horizontal swipe on the open notch switches tabs; scrolling
+    /// over the closed notch changes the volume. Both come from the existing
+    /// event monitors, so they cost nothing when unused.
+    private func handleScroll(_ event: NSEvent, isLocal: Bool) {
+        let location = NSEvent.mouseLocation
+        switch viewModel.state {
+        case .expanded:
+            guard isLocal, Prefs.gestureSwipeTabs.value, event.hasPreciseScrollingDeltas,
+                  expandedHoverRect.contains(location) else { return }
+            if event.phase == .began || event.phase == .mayBegin {
+                swipeAccumulator = 0
+                swipeHandled = false
+            }
+            if event.phase == .ended || event.phase == .cancelled {
+                swipeAccumulator = 0
+                swipeHandled = false
+                return
+            }
+            // Ignore momentum and mostly-vertical scrolling (lists inside modules).
+            guard event.momentumPhase.isEmpty,
+                  abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) * 1.5 else { return }
+            swipeAccumulator += event.scrollingDeltaX
+            // The shelf scrolls horizontally itself, so swiping there scrolls files instead.
+            guard !swipeHandled, abs(swipeAccumulator) > 60, viewModel.selectedTab != ShelfModuleID else { return }
+            swipeHandled = true
+            switchTab(by: swipeAccumulator < 0 ? 1 : -1)
+
+        case .collapsed:
+            guard !isLocal, Prefs.gestureScrollVolume.value,
+                  collapsedHoverRect.insetBy(dx: -6, dy: -2).contains(location) else { return }
+            // Normalise to finger/wheel direction: up = louder.
+            var delta = event.scrollingDeltaY * (event.isDirectionInvertedFromDevice ? -1 : 1)
+            delta /= event.hasPreciseScrollingDeltas ? 250 : 25
+            guard delta != 0 else { return }
+            let audio = AudioDeviceService.shared
+            audio.start()
+            guard audio.canSetVolume else { return }
+            audio.setVolume(audio.volume + Float(delta))
+            let percent = Int((audio.volume * 100).rounded())
+            showPopup(NotchPopup(
+                kind: "volume",
+                icon: percent == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                iconColor: .white, title: "Volume", detail: nil,
+                level: Double(audio.volume), trailing: "\(percent)%"
+            ), duration: 1.2)
+        }
+    }
+
+    /// Moves to the next/previous tab (Home first, then enabled modules in order).
+    private func switchTab(by offset: Int) {
+        let tabs = ["home"] + AppState.shared.registry.enabled.map(\.id)
+        let current = tabs.firstIndex(of: viewModel.selectedTab) ?? 0
+        let next = min(max(current + offset, 0), tabs.count - 1)
+        guard next != current else { return }
+        withAnimation(NotchAnimation.content) { viewModel.select(tab: tabs[next]) }
+        if Prefs.haptics.value {
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        }
+    }
+
     // MARK: Pop-ups
 
     private var popupTask: Task<Void, Never>?
@@ -142,7 +207,14 @@ final class NotchWindowController {
     func showPopup(_ popup: NotchPopup, duration: TimeInterval) {
         guard viewModel.state == .collapsed else { return }
         popupTask?.cancel()
-        withAnimation(NotchAnimation.open) { viewModel.popup = popup }
+        var popup = popup
+        if let kind = popup.kind, let current = viewModel.popup, current.kind == kind {
+            // Same kind already showing (e.g. volume while scrolling): update in place.
+            popup.id = current.id
+            viewModel.popup = popup
+        } else {
+            withAnimation(NotchAnimation.open) { viewModel.popup = popup }
+        }
         popupTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled, let self, self.viewModel.popup?.id == popup.id else { return }
@@ -157,7 +229,7 @@ final class NotchWindowController {
     // MARK: Event monitors
 
     private func installMonitors() {
-        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp]
+        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp, .scrollWheel]
         if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
             MainActor.assumeIsolated { self?.handle(event: event, isLocal: false) }
         }) {
@@ -184,6 +256,8 @@ final class NotchWindowController {
             }
         case .leftMouseDragged:
             handleDrag(at: location)
+        case .scrollWheel:
+            handleScroll(event, isLocal: isLocal)
         case .leftMouseUp:
             viewModel.isDraggingFile = false
             handleMouse(at: location)
