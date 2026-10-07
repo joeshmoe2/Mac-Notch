@@ -11,5 +11,8 @@
 	<!-- Hardened Runtime / sandbox: allow EventKit for the Calendar and Reminders modules. -->
 	<key>com.apple.security.personal-information.calendars</key>
 	<true/>
+	<!-- Hardened Runtime: allow camera access for the Mirror module. -->
+	<key>com.apple.security.device.camera</key>
+	<true/>
 </dict>
 </plist>

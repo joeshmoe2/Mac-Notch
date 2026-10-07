@@ -16,6 +16,8 @@
 	<string>NotchHub shows your reminders in the notch so you can check them off and add new ones.</string>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>NotchHub shows your reminders in the notch so you can check them off and add new ones.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The Mirror tab shows your camera so you can check how you look. The camera is only on while that tab is open.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NotchHub controls Music and Spotify to show what's playing and provide playback controls.</string>
 </dict>
