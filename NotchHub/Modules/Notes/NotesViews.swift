@@ -8,6 +8,7 @@ struct NotesExpandedView: View {
     @State private var armedDeleteID: NoteID?
     @AppStorage(Prefs.notesMonospaced) private var monospaced
     @AppStorage(Prefs.notesLiveFormatting) private var liveFormatting
+    @AppStorage(Prefs.accentColor) private var accentHex
     @Environment(\.notchFontSize) private var fontSize
 
     var body: some View {
@@ -116,6 +117,7 @@ struct NotesExpandedView: View {
                         fontSize: fontSize,
                         monospaced: monospaced,
                         liveFormatting: liveFormatting,
+                        accentHex: accentHex,
                         inset: CGSize(width: 6, height: 6)
                     )
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
@@ -146,7 +148,7 @@ private struct NoteListRow: View {
         .font(.system(size: 12))
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? Color.accentColor.opacity(0.5) : .clear))
+        .background(RoundedRectangle(cornerRadius: 6).fill(selected ? AnyShapeStyle(.tint.opacity(0.5)) : AnyShapeStyle(Color.clear)))
         .contentShape(Rectangle())
     }
 }

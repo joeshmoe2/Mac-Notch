@@ -38,7 +38,6 @@ enum MarkdownInline {
                 var part = AttributedString(String(source[r]))
                 part.font = .system(size: size * 0.72)
                 part.baselineOffset = size * 0.4
-                part.foregroundColor = .accentColor
                 result += part
             }
             cursor = match.range.location + match.range.length

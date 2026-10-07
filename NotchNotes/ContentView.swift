@@ -192,6 +192,7 @@ private struct NoteEditor: View {
             fontSize: fontSize,
             monospaced: monospaced,
             liveFormatting: liveFormatting,
+            accentHex: SharedAccent.shared.hex,
             inset: CGSize(width: 20, height: 14)
         )
     }

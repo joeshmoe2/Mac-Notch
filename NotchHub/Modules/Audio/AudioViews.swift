@@ -41,7 +41,8 @@ struct AlbumArtView: View {
 /// Animated equalizer bars. Updates 4× per second (cheap) rather than every frame.
 struct AudioBarsView: View {
     var isPlaying: Bool
-    var color: Color = .accentColor
+    /// nil = the notch accent color (tint).
+    var color: Color?
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: isPlaying ? 0.3 : 3600)) { context in
@@ -51,7 +52,7 @@ struct AudioBarsView: View {
                     ForEach(0..<4, id: \.self) { i in
                         let h = isPlaying ? 0.3 + 0.7 * abs(sin(seed * 2.3 + Double(i) * 1.7)) : 0.2
                         Capsule()
-                            .fill(color)
+                            .fill(color.map { AnyShapeStyle($0) } ?? AnyShapeStyle(.tint))
                             .frame(height: geo.size.height * h)
                             .animation(.easeInOut(duration: 0.3), value: h)
                     }

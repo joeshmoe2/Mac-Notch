@@ -12,6 +12,8 @@ struct MarkdownTextEditor: NSViewRepresentable {
     var monospaced = false
     /// When false, behaves like a plain text editor (no styling).
     var liveFormatting = true
+    /// "#RRGGBB" accent (from NotchHub's Appearance settings); nil = system accent.
+    var accentHex: String?
     var inset = CGSize(width: 12, height: 10)
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -56,6 +58,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
         let styleChanged = coordinator.parent.fontSize != fontSize
             || coordinator.parent.monospaced != monospaced
             || coordinator.parent.liveFormatting != liveFormatting
+            || coordinator.parent.accentHex != accentHex
         coordinator.parent = self
         guard let textView = coordinator.textView else { return }
         // Match the SwiftUI color scheme (the notch forces dark content).
@@ -86,7 +89,11 @@ struct MarkdownTextEditor: NSViewRepresentable {
         }
 
         private var highlighter: MarkdownHighlighter {
-            MarkdownHighlighter(fontSize: parent.fontSize, monospaced: parent.monospaced)
+            MarkdownHighlighter(fontSize: parent.fontSize, monospaced: parent.monospaced, accent: accent)
+        }
+
+        private var accent: NSColor {
+            parent.accentHex.flatMap(NSColor.init(hex:)) ?? .controlAccentColor
         }
 
         func restyle() {
@@ -97,6 +104,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
         }
 
         private func style(_ storage: NSTextStorage) {
+            textView?.insertionPointColor = accent
             if parent.liveFormatting {
                 highlighter.apply(to: storage)
             } else {

@@ -8,6 +8,8 @@ import AppKit
 struct MarkdownHighlighter {
     var fontSize: CGFloat
     var monospaced: Bool
+    /// Color for list markers, checkboxes, quote bars and footnotes.
+    var accent: NSColor = .controlAccentColor
 
     private var baseFont: NSFont {
         monospaced
@@ -17,7 +19,6 @@ struct MarkdownHighlighter {
 
     private var codeFont: NSFont { .monospacedSystemFont(ofSize: fontSize * 0.92, weight: .regular) }
     private let markerColor = NSColor.tertiaryLabelColor
-    private let accent = NSColor.controlAccentColor
 
     // MARK: Regexes (compiled once)
 

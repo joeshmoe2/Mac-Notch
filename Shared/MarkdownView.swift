@@ -51,7 +51,7 @@ struct MarkdownView: View {
         case .quote(let text):
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.accentColor.opacity(0.7))
+                    .fill(.tint.opacity(0.7))
                     .frame(width: 3)
                 inline(text)
                     .foregroundStyle(.secondary)
@@ -108,7 +108,7 @@ struct MarkdownView: View {
                 Divider()
                 ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(note.label).foregroundStyle(Color.accentColor)
+                        Text(note.label).foregroundStyle(.tint)
                         inline(note.text)
                     }
                     .font(.system(size: baseSize * 0.82))
@@ -135,7 +135,7 @@ struct MarkdownView: View {
                     onToggleTask?(item.line)
                 } label: {
                     Image(systemName: checked ? "checkmark.square.fill" : "square")
-                        .foregroundStyle(checked ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(checked ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 }
                 .buttonStyle(.plain)
                 .disabled(onToggleTask == nil)

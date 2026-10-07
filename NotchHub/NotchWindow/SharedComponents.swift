@@ -13,7 +13,7 @@ struct PillButtonStyle: ButtonStyle {
             .padding(.vertical, 5)
             .foregroundStyle(prominent ? Color.white : Color.primary)
             .background(
-                Capsule().fill(prominent ? Color.accentColor : Color.white.opacity(configuration.isPressed ? 0.2 : 0.1))
+                Capsule().fill(prominent ? AnyShapeStyle(.tint) : AnyShapeStyle(Color.white.opacity(configuration.isPressed ? 0.2 : 0.1)))
             )
             .opacity(isEnabled ? 1 : 0.4)
             .scaleEffect(configuration.isPressed ? 0.95 : 1)

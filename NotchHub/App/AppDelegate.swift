@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKeyService.shared.applyPreferences()
         // Remove any website block left behind by a crash.
         WebsiteBlocker.shared.cleanUpOnLaunch()
+        SharedAccent.publish(Prefs.accentColor.value)
         lastDisplaySignature = displaySignature
 
         // React to settings changes (from the Settings window, import or reset).
@@ -50,6 +51,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NotchWindowManager.shared.relayout()
             }
             HotKeyService.shared.applyPreferences()
+            SharedAccent.publish(Prefs.accentColor.value)
         }
     }
 }

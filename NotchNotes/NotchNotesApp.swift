@@ -10,6 +10,7 @@ struct NotchNotesApp: App {
         Window("NotchNotes", id: "main") {
             ContentView(model: model)
                 .frame(minWidth: 640, minHeight: 420)
+                .sharedAccentTint()
         }
         .defaultSize(width: 920, height: 620)
         .commands {
@@ -55,6 +56,7 @@ struct NotchNotesApp: App {
 
         Settings {
             NotchNotesSettings(model: model)
+                .sharedAccentTint()
         }
     }
 }

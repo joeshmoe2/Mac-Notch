@@ -107,7 +107,7 @@ private struct TabButton: View {
                 .background {
                     if selected {
                         Capsule()
-                            .fill(Color.accentColor.opacity(0.85))
+                            .fill(.tint.opacity(0.85))
                             .matchedGeometryEffect(id: "tabSelection", in: namespace)
                     } else if hovering {
                         Capsule().fill(Color.white.opacity(0.08))

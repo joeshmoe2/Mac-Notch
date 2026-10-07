@@ -68,7 +68,7 @@ struct NotchRootView: View {
         .clipShape(shape)
         .overlay {
             if viewModel.isDropTargeted {
-                shape.stroke(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                shape.stroke(.tint, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
             }
         }
         .contentShape(shape)
@@ -160,28 +160,5 @@ struct CollapsedView: View {
             .id(activity.moduleID)
             .transition(.opacity)
         }
-    }
-}
-
-extension Color {
-    /// Parses "#RRGGBB" or "RRGGBB".
-    init?(hex: String) {
-        var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6, let value = UInt32(s, radix: 16) else { return nil }
-        self.init(
-            red: Double((value >> 16) & 0xFF) / 255,
-            green: Double((value >> 8) & 0xFF) / 255,
-            blue: Double(value & 0xFF) / 255
-        )
-    }
-
-    /// "#RRGGBB" representation (sRGB).
-    var hexString: String {
-        let ns = NSColor(self).usingColorSpace(.sRGB) ?? .systemBlue
-        let r = Int((ns.redComponent * 255).rounded())
-        let g = Int((ns.greenComponent * 255).rounded())
-        let b = Int((ns.blueComponent * 255).rounded())
-        return String(format: "#%02X%02X%02X", r, g, b)
     }
 }
