@@ -107,6 +107,8 @@ final class NotchWindowController {
     func expand(byHover: Bool = true) {
         cancelPending()
         guard viewModel.state == .collapsed else { return }
+        popupTask?.cancel()
+        viewModel.popup = nil
         mouseVisitedSinceOpen = byHover
         AppState.shared.prepareForExpand()
         panel.ignoresMouseEvents = false
@@ -129,6 +131,23 @@ final class NotchWindowController {
         viewModel.suppressAutoClose = false
         withAnimation(NotchAnimation.close) { viewModel.state = .collapsed }
         panel.ignoresMouseEvents = true
+    }
+
+    // MARK: Pop-ups
+
+    private var popupTask: Task<Void, Never>?
+
+    /// Briefly grows the collapsed notch to show `popup`, then shrinks back.
+    /// Ignored while the notch is open (the user is busy with it).
+    func showPopup(_ popup: NotchPopup, duration: TimeInterval) {
+        guard viewModel.state == .collapsed else { return }
+        popupTask?.cancel()
+        withAnimation(NotchAnimation.open) { viewModel.popup = popup }
+        popupTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(duration))
+            guard !Task.isCancelled, let self, self.viewModel.popup?.id == popup.id else { return }
+            withAnimation(NotchAnimation.close) { self.viewModel.popup = nil }
+        }
     }
 
     func toggle() {

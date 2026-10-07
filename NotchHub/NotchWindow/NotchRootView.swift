@@ -59,6 +59,10 @@ struct NotchRootView: View {
                         insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top)).animation(NotchAnimation.content.delay(0.05)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
+            } else if let popup = viewModel.popup {
+                NotchPopupView(popup: popup, notchHeight: viewModel.geometry.notchSize.height)
+                    .id(popup.id)
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
             } else {
                 CollapsedView(viewModel: viewModel)
                     .transition(.opacity.animation(.easeInOut(duration: 0.15)))

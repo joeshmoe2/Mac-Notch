@@ -14,5 +14,8 @@
 	<!-- Hardened Runtime: allow camera access for the Mirror module. -->
 	<key>com.apple.security.device.camera</key>
 	<true/>
+	<!-- Sandbox only: Bluetooth access for the headphone pop-up. Harmless when not sandboxed. -->
+	<key>com.apple.security.device.bluetooth</key>
+	<true/>
 </dict>
 </plist>

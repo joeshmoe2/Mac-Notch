@@ -89,6 +89,12 @@ final class NotchWindowManager {
         target?.toggle()
     }
 
+    /// Shows a pop-up on every notch (respects the pop-up duration setting).
+    func showPopup(_ popup: NotchPopup) {
+        let duration = min(max(Prefs.popupDuration.value, 1), 10)
+        controllers.values.forEach { $0.showPopup(popup, duration: duration) }
+    }
+
     func collapseAll() {
         controllers.values.forEach { $0.collapse() }
     }

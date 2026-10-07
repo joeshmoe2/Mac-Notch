@@ -14,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Remove any website block left behind by a crash.
         WebsiteBlocker.shared.cleanUpOnLaunch()
         SharedAccent.publish(Prefs.accentColor.value)
+        // Charger and headphone pop-ups (event-driven; each checks its own setting).
+        PowerMonitor.shared.start()
+        HeadphonesMonitor.shared.start()
         lastDisplaySignature = displaySignature
         // First run: welcome + permissions, one at a time.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {

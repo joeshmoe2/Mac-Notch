@@ -17,6 +17,9 @@ final class NotchViewModel {
     /// Set while a popover/menu/share sheet is open so the notch doesn't collapse under it.
     var suppressAutoClose = false
 
+    /// A brief notification shown by growing the collapsed notch (charger, headphones).
+    var popup: NotchPopup?
+
     /// Expanded size from preferences (updated by the window controller).
     var expandedSize: CGSize
 
@@ -42,8 +45,15 @@ final class NotchViewModel {
         return size
     }
 
+    var popupSize: CGSize {
+        CGSize(width: max(collapsedSize.width, geometry.notchSize.width + 220), height: geometry.notchSize.height + 46)
+    }
+
     var currentSize: CGSize {
-        isExpanded ? CGSize(width: max(expandedSize.width, collapsedSize.width), height: expandedSize.height) : collapsedSize
+        if isExpanded {
+            return CGSize(width: max(expandedSize.width, collapsedSize.width), height: expandedSize.height)
+        }
+        return popup != nil ? popupSize : collapsedSize
     }
 
     func select(tab: String) {

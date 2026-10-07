@@ -169,6 +169,9 @@ struct BehaviorSettingsView: View {
     @AppStorage(Prefs.haptics) private var haptics
     @AppStorage(Prefs.openOnClick) private var openOnClick
     @AppStorage(Prefs.rememberLastTab) private var rememberLastTab
+    @AppStorage(Prefs.popupCharger) private var popupCharger
+    @AppStorage(Prefs.popupHeadphones) private var popupHeadphones
+    @AppStorage(Prefs.popupDuration) private var popupDuration
 
     var body: some View {
         Form {
@@ -186,6 +189,13 @@ struct BehaviorSettingsView: View {
             }
             Section("Tabs") {
                 Toggle("Reopen on the last used tab", isOn: $rememberLastTab)
+            }
+            Section("Pop-ups") {
+                Toggle("Show battery when the charger is connected or removed", isOn: $popupCharger)
+                Toggle("Show headphones when they connect", isOn: $popupHeadphones)
+                LabeledSlider(title: "Stay open for", value: $popupDuration, range: 1...10, step: 0.5, format: "%.1fs")
+                Text("Headphone battery isn't shown: macOS has no public API for it.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
