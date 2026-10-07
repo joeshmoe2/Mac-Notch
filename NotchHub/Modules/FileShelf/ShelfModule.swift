@@ -7,6 +7,8 @@ extension Prefs {
     /// 0 = never.
     static let shelfAutoClearHours = PrefKey("shelf.autoClearHours", 24)
     static let shelfMaxItems = PrefKey("shelf.maxItems", 20)
+    /// Put new screenshots on the shelf automatically.
+    static let shelfAutoAddScreenshots = PrefKey("shelf.autoAddScreenshots", true)
 }
 
 /// Temporary holding area for files dragged onto the notch.
@@ -171,7 +173,36 @@ final class ShelfModule: NotchModule {
 
     // MARK: NotchModule
 
-    func willExpand() { autoClear() }
+    func willExpand() {
+        autoClear()
+        // Picks up a changed screenshot location (Screenshot app › Options › Save to).
+        updateScreenshotWatching()
+    }
+
+    // MARK: Screenshots
+
+    @ObservationIgnored private var active = false
+    @ObservationIgnored private lazy var screenshotWatcher = ScreenshotWatcher { urls in
+        AppState.shared.module(ShelfModule.self)?.add(urls)
+    }
+
+    func setActive(_ active: Bool) {
+        self.active = active
+        updateScreenshotWatching()
+    }
+
+    /// Starts/stops watching the screenshot folder to match the setting.
+    func updateScreenshotWatching() {
+        if active && Prefs.shelfAutoAddScreenshots.value {
+            screenshotWatcher.start()
+        } else {
+            screenshotWatcher.stop()
+        }
+    }
+
+    var screenshotFolderPath: String {
+        ScreenshotWatcher.screenshotFolder.path.replacingOccurrences(of: NSHomeDirectory(), with: "~")
+    }
 
     func compactView() -> AnyView { AnyView(ShelfCompactView(module: self)) }
     func expandedView() -> AnyView { AnyView(ShelfExpandedView(module: self)) }

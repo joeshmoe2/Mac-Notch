@@ -143,6 +143,7 @@ struct ShelfSettingsView: View {
     @AppStorage(Prefs.shelfCopyFiles) private var copyFiles
     @AppStorage(Prefs.shelfAutoClearHours) private var autoClearHours
     @AppStorage(Prefs.shelfMaxItems) private var maxItems
+    @AppStorage(Prefs.shelfAutoAddScreenshots) private var autoAddScreenshots
 
     var body: some View {
         Toggle("Copy files to the shelf instead of referencing them", isOn: $copyFiles)
@@ -156,6 +157,11 @@ struct ShelfSettingsView: View {
             Text("1 week").tag(168)
         }
         Stepper("Maximum items: \(maxItems)", value: $maxItems, in: 1...100)
+        Toggle("Add new screenshots to the shelf automatically", isOn: $autoAddScreenshots)
+            .onChange(of: autoAddScreenshots) { module.updateScreenshotWatching() }
+        Text("Watching \(module.screenshotFolderPath) — change it in the Screenshot app (⇧⌘5) › Options › Save to.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
         Button("Clear Shelf", role: .destructive) { module.clear() }
     }
 }
