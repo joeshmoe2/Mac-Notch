@@ -28,6 +28,7 @@ final class AppState {
             CameraModule(),
             QuickActionsModule(),
             WorldClocksModule(),
+            CalculatorModule(),
         ]
     }
 
