@@ -60,6 +60,7 @@ struct AudioBarsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .accessibilityHidden(true)
     }
 }
 
@@ -77,6 +78,8 @@ struct AudioExpandedView: View {
                     .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
                     .onTapGesture { media.openPlayer() }
                     .tooltip("Open \(playing.player.displayName)")
+                    .accessibilityLabel("Album artwork. Open \(playing.player.displayName)")
+                    .accessibilityAddTraits(.isButton)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(playing.title).font(.system(size: 15, weight: .semibold)).lineLimit(1)
                     Text(playing.artist).foregroundStyle(.secondary).lineLimit(1)
@@ -104,6 +107,7 @@ struct AudioExpandedView: View {
                     }
                 })
                 .controlSize(.mini)
+                .accessibilityLabel("Playback position")
                 HStack {
                     Text(TimeFormat.clock(elapsed))
                     Spacer()
@@ -163,6 +167,7 @@ private struct ControlButton: View {
         }
         .buttonStyle(.plain)
         .tooltip(help, edge: .top) { hovering = $0 }
+        .accessibilityLabel(help)
     }
 }
 
@@ -179,6 +184,7 @@ struct VolumeRow: View {
             Slider(value: Binding(get: { Double(devices.volume) }, set: { devices.setVolume(Float($0)) }), in: 0...1)
                 .controlSize(.mini)
                 .disabled(!devices.canSetVolume)
+                .accessibilityLabel("Volume")
             Menu {
                 ForEach(devices.devices) { device in
                     Button {
@@ -196,6 +202,7 @@ struct VolumeRow: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
+            .accessibilityLabel("Output device")
             .fixedSize()
             .tooltip("Output: " + (devices.devices.first { $0.id == devices.defaultOutputID }?.name ?? "choose device"), edge: .top)
         }

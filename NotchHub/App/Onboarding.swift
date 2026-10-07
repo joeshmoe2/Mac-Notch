@@ -61,6 +61,7 @@ private enum OnboardingStep: Int, CaseIterable {
 struct OnboardingView: View {
     let onFinish: () -> Void
     @State private var step: OnboardingStep = .welcome
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(Prefs.accentColor) private var accentHex
     @AppStorage(Prefs.hotKeyCode) private var hotKeyCode
     @AppStorage(Prefs.hotKeyModifiers) private var hotKeyModifiers
@@ -79,8 +80,8 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, 36)
             .padding(.top, 36)
-            .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
-                                    removal: .move(edge: .leading).combined(with: .opacity)))
+            .transition(reduceMotion ? .opacity : .asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                                              removal: .move(edge: .leading).combined(with: .opacity)))
             .id(step)
 
             Divider()

@@ -74,6 +74,13 @@ private struct ClipRow: View {
         .contentShape(Rectangle())
         .onTapGesture { module.copy(item) }
         .onHover { hovering = $0 }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.kind == .image ? "Image" : (item.text ?? ""))
+        .accessibilityHint("Copies this item")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { module.copy(item) }
+        .accessibilityAction(named: item.pinned ? "Unpin" : "Pin") { module.togglePin(item) }
+        .accessibilityAction(named: "Remove") { module.remove(item) }
     }
 
     @ViewBuilder

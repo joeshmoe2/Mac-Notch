@@ -59,6 +59,7 @@ struct NotchPopupView: View {
             .frame(maxHeight: .infinity)
         }
         .foregroundStyle(.white)
+        .accessibilityElement(children: .combine)
     }
 }
 

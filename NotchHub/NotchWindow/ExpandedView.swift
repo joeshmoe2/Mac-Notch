@@ -6,6 +6,7 @@ struct ExpandedView: View {
     let viewModel: NotchViewModel
     let actions: NotchActions
     @Namespace private var tabNamespace
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var registry: ModuleRegistry { AppState.shared.registry }
 
@@ -80,7 +81,7 @@ struct ExpandedView: View {
             }
         }
         .id(activeTab)
-        .transition(.opacity.combined(with: .offset(y: 6)))
+        .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 6)))
     }
 
     private func select(_ id: String) {
@@ -96,12 +97,14 @@ private struct TabButton: View {
     let namespace: Namespace.ID
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.notchFontSize) private var fontSize
+    private var fontScale: CGFloat { min(max(fontSize / 13, 0.9), 1.4) }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 28, height: 24)
+                .font(.system(size: 12 * fontScale, weight: .semibold))
+                .frame(width: 28 * fontScale, height: 24 * fontScale)
                 .foregroundStyle(selected ? Color.white : Color.secondary)
                 .background {
                     if selected {
@@ -116,6 +119,8 @@ private struct TabButton: View {
         }
         .buttonStyle(.plain)
         .tooltip(title) { hovering = $0 }
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -136,6 +141,7 @@ struct HeaderIconButton: View {
         }
         .buttonStyle(.plain)
         .tooltip(help) { hovering = $0 }
+        .accessibilityLabel(help)
     }
 }
 
@@ -184,9 +190,11 @@ struct Card<Content: View>: View {
 struct ModuleTileHeader: View {
     let icon: String
     let title: String
+    @Environment(\.notchFontSize) private var fontSize
     var body: some View {
         Label(title, systemImage: icon)
-            .font(.caption.weight(.semibold))
+            .font(.system(size: fontSize * 0.8, weight: .semibold))
+            .accessibilityAddTraits(.isHeader)
             .foregroundStyle(.secondary)
             .lineLimit(1)
     }

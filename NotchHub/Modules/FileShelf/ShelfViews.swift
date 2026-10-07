@@ -70,6 +70,7 @@ private struct ShelfTile: View {
                     }
                     .buttonStyle(.plain)
                     .tooltip("Remove from shelf")
+                    .accessibilityLabel("Remove \(item.fileName) from shelf")
                     .offset(x: 6, y: -6)
                 }
             }

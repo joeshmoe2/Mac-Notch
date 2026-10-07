@@ -22,6 +22,7 @@ struct NotchRootView: View {
     @AppStorage(Prefs.accentColor) private var accentHex
     @AppStorage(Prefs.fontSize) private var fontSize
     @Environment(\.colorScheme) private var systemScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var namespace
 
     private var expanded: Bool { viewModel.isExpanded }
@@ -47,6 +48,8 @@ struct NotchRootView: View {
         .environment(\.notchExpanded, expanded)
         .environment(\.notchFontSize, fontSize)
         .environment(\.notchActions, controller)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("NotchHub")
     }
 
     private var notch: some View {
@@ -56,7 +59,9 @@ struct NotchRootView: View {
             if expanded {
                 ExpandedView(viewModel: viewModel, actions: controller)
                     .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top)).animation(NotchAnimation.content.delay(0.05)),
+                        insertion: reduceMotion
+                            ? .opacity.animation(.easeInOut(duration: 0.15))
+                            : .opacity.combined(with: .scale(scale: 0.92, anchor: .top)).animation(NotchAnimation.content.delay(0.05)),
                         removal: .opacity.animation(.easeOut(duration: 0.12))
                     ))
             } else if let popup = viewModel.popup {
@@ -161,6 +166,8 @@ struct CollapsedView: View {
             }
             .frame(height: height)
             .foregroundStyle(.white)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(AppState.shared.registry.module(id: activity.moduleID)?.name ?? "Live activity")
             .id(activity.moduleID)
             .transition(.opacity)
         }

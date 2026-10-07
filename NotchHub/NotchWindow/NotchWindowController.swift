@@ -353,9 +353,17 @@ private extension NSWindow {
 /// Animations shared by the window controller and views.
 enum NotchAnimation {
     static var speed: Double { max(0.25, Prefs.animationSpeed.value) }
-    static var open: Animation { .spring(response: 0.42 / speed, dampingFraction: 0.78) }
-    static var close: Animation { .spring(response: 0.36 / speed, dampingFraction: 0.92) }
-    static var content: Animation { .spring(response: 0.3 / speed, dampingFraction: 0.85) }
+    /// System Settings › Accessibility › Display › Reduce motion: springs become short fades.
+    static var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    static var open: Animation {
+        reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.42 / speed, dampingFraction: 0.78)
+    }
+    static var close: Animation {
+        reduceMotion ? .easeInOut(duration: 0.18) : .spring(response: 0.36 / speed, dampingFraction: 0.92)
+    }
+    static var content: Animation {
+        reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.3 / speed, dampingFraction: 0.85)
+    }
 }
 
 /// Thin, view-safe wrapper so SwiftUI views can ask the controller to do things

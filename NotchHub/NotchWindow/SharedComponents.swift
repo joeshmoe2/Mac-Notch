@@ -5,10 +5,11 @@ import UserNotifications
 struct PillButtonStyle: ButtonStyle {
     var prominent = false
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.notchFontSize) private var fontSize
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: fontSize * 0.92, weight: .semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
             .foregroundStyle(prominent ? Color.white : Color.primary)
@@ -29,17 +30,22 @@ struct IconButton: View {
     var tooltipEdge: VerticalEdge = .bottom
     let action: () -> Void
     @State private var hovering = false
+    @Environment(\.notchFontSize) private var fontSize
+
+    /// Icons grow with the Appearance font size (for larger text).
+    private var scaled: CGFloat { size * min(max(fontSize / 13, 0.9), 1.4) }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: size, weight: .semibold))
-                .frame(width: size * 2.2, height: size * 2.2)
+                .font(.system(size: scaled, weight: .semibold))
+                .frame(width: scaled * 2.2, height: scaled * 2.2)
                 .background(Circle().fill(Color.white.opacity(hovering ? 0.15 : 0.08)))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .tooltip(help, edge: tooltipEdge) { hovering = $0 }
+        .accessibilityLabel(help)
     }
 }
 
@@ -112,11 +118,15 @@ struct ProgressRing: View {
     var body: some View {
         ZStack {
             Circle().stroke(color.opacity(0.2), lineWidth: lineWidth)
+                .accessibilityHidden(true)
             Circle()
                 .trim(from: 0, to: min(max(progress, 0), 1))
                 .stroke(color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
         }
+        .accessibilityElement()
+        .accessibilityLabel("Progress")
+        .accessibilityValue("\(Int((min(max(progress, 0), 1) * 100).rounded())) percent")
     }
 }
 

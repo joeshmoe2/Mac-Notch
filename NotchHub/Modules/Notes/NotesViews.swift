@@ -85,6 +85,9 @@ struct NotesExpandedView: View {
                                     selected: note.id == module.selectedID,
                                     pinned: note.id == module.pinnedID)
                             .onTapGesture { module.selectedID = note.id }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(note.id == module.selectedID ? [.isButton, .isSelected] : .isButton)
+                            .accessibilityAction { module.selectedID = note.id }
                             .contextMenu {
                                 Button(note.id == module.pinnedID ? "Unpin from Home" : "Pin to Home") {
                                     module.setPinned(note.id == module.pinnedID ? nil : note.id)

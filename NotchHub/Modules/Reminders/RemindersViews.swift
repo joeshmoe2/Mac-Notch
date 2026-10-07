@@ -76,6 +76,7 @@ private struct ReminderRow: View {
             }
             .buttonStyle(.plain)
             .tooltip(item.isCompleted ? "Mark as not done" : "Mark as done")
+            .accessibilityLabel(item.isCompleted ? "Mark \(item.title) as not done" : "Mark \(item.title) as done")
             VStack(alignment: .leading, spacing: 1) {
                 Text(item.title)
                     .strikethrough(item.isCompleted)

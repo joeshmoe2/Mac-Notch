@@ -363,7 +363,9 @@ struct AppearanceSettingsView: View {
             }
             Section("Motion & Text") {
                 LabeledSlider(title: "Animation speed", value: $animationSpeed, range: 0.5...2, step: 0.1, format: "%.1f×")
-                LabeledSlider(title: "Font size", value: $fontSize, range: 11...17, step: 1, format: "%.0f pt")
+                LabeledSlider(title: "Font size", value: $fontSize, range: 11...24, step: 1, format: "%.0f pt")
+                Text("Larger text may need a taller notch — increase Height above if content is cut off.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
