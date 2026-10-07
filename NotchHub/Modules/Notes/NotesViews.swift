@@ -149,17 +149,21 @@ private struct NoteListRow: View {
 struct NotesCompactView: View {
     let module: NotesModule
 
+    /// First lines of a note (line numbers stay the same, so checkboxes still toggle the right line).
+    static func excerpt(_ body: String, maxLines: Int = 14) -> String {
+        body.components(separatedBy: "\n").prefix(maxLines).joined(separator: "\n")
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             let note = module.pinned ?? module.notes.first
             ModuleTileHeader(icon: module.pinned != nil ? "pin.fill" : "note.text",
                              title: note?.title ?? "Notes")
             if let note {
-                MarkdownView(text: note.body, baseSize: 11, baseURL: module.store.folder, compact: true) { line in
+                // Only the start of the note fits in a tile; don't lay out the rest.
+                MarkdownView(text: Self.excerpt(note.body), baseSize: 11, baseURL: module.store.folder, compact: true) { line in
                     module.toggleCheckbox(noteID: note.id, line: line)
                 }
-                .frame(maxHeight: .infinity, alignment: .top)
-                .clipped()
             } else {
                 Text("No notes yet").foregroundStyle(.secondary)
             }

@@ -30,7 +30,7 @@ struct ExpandedView: View {
             header
                 .frame(height: max(26, viewModel.geometry.notchSize.height))
             content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .fillingAvailableSpace(alignment: .top)
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.bottom, 14)
@@ -158,7 +158,7 @@ struct HomeView: View {
             HStack(spacing: 8) {
                 ForEach(modules, id: \.id) { module in
                     module.compactView()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .fillingAvailableSpace(alignment: .topLeading)
                         .padding(10)
                         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.white.opacity(0.06)))
                         .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -190,5 +190,16 @@ struct ModuleTileHeader: View {
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
             .lineLimit(1)
+    }
+}
+
+extension View {
+    /// Takes exactly the space offered and clips anything taller, instead of
+    /// growing. Without this, a long note in a tile or tab could make the
+    /// content taller than the notch and push the tab bar out of view.
+    func fillingAvailableSpace(alignment: Alignment) -> some View {
+        Color.clear
+            .overlay(alignment: alignment) { self }
+            .clipped()
     }
 }
