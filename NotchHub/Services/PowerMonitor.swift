@@ -63,7 +63,7 @@ final class PowerMonitor {
               let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else {
             return Snapshot(onAC: true, isCharging: false, percent: nil, hasBattery: false)
         }
-        let providing = (IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String?) ?? kIOPMACPowerKey
+        let providing = (IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() as String?) ?? kIOPSACPowerValue
         for ps in list {
             guard let description = IOPSGetPowerSourceDescription(info, ps)?.takeUnretainedValue() as? [String: Any],
                   (description[kIOPSTypeKey] as? String) == kIOPSInternalBatteryType else { continue }
@@ -78,6 +78,6 @@ final class PowerMonitor {
                             isCharging: description[kIOPSIsChargingKey] as? Bool ?? false,
                             percent: percent, hasBattery: true)
         }
-        return Snapshot(onAC: providing == kIOPMACPowerKey, isCharging: false, percent: nil, hasBattery: false)
+        return Snapshot(onAC: providing == kIOPSACPowerValue, isCharging: false, percent: nil, hasBattery: false)
     }
 }
