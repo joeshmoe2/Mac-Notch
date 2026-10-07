@@ -25,6 +25,14 @@ final class ModuleRegistry {
         stored += ids.filter { !stored.contains($0) }
         order = stored
         disabled = Set(Prefs.disabledModules.value.idList)
+        // Modules seen for the first time start in their default state.
+        let known = Set(Prefs.knownModules.value.idList)
+        let newlyOff = all.filter { !known.contains($0.id) && !$0.enabledByDefault }.map(\.id)
+        if !newlyOff.isEmpty {
+            disabled.formUnion(newlyOff)
+            Prefs.disabledModules.set(Array(disabled).sorted().joinedIDs)
+        }
+        if known != Set(ids) { Prefs.knownModules.set(ids.joinedIDs) }
         home = Prefs.homeModules.value.idList.filter(ids.contains)
         var live = Prefs.liveActivityOrder.value.idList.filter(ids.contains)
         live += all.filter { $0.supportsLiveActivity && !live.contains($0.id) }.map(\.id)

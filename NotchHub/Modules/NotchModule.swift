@@ -19,6 +19,10 @@ protocol NotchModule: AnyObject {
     /// Module-specific preferences, embedded in the Settings window.
     func settingsView() -> AnyView
 
+    /// Whether the module starts switched on the first time NotchHub sees it.
+    /// Privacy-sensitive modules (clipboard, camera) return false.
+    var enabledByDefault: Bool { get }
+
     /// Whether this module can ever show a live activity (shown in Settings).
     var supportsLiveActivity: Bool { get }
     /// The live activity to show in the collapsed notch right now, or nil.
@@ -33,6 +37,7 @@ protocol NotchModule: AnyObject {
 
 extension NotchModule {
     var isEnabled: Bool { AppState.shared.registry.isEnabled(id) }
+    var enabledByDefault: Bool { true }
     var supportsLiveActivity: Bool { false }
     var liveActivity: LiveActivity? { nil }
     func setActive(_ active: Bool) {}

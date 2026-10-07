@@ -67,6 +67,8 @@ enum Prefs {
     // Modules (comma separated module ids)
     static let moduleOrder = PrefKey("modules.order", "")
     static let disabledModules = PrefKey("modules.disabled", "")
+    /// Module ids NotchHub has seen before (so new modules get their default on/off state once).
+    static let knownModules = PrefKey("modules.known", "")
     static let homeModules = PrefKey("modules.home", "timer,pomodoro,weather,audio,notes")
     static let liveActivityOrder = PrefKey("modules.liveOrder", "audio,pomodoro,timer")
     static let disabledLiveActivities = PrefKey("modules.liveDisabled", "")
