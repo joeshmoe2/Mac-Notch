@@ -8,12 +8,12 @@ struct SettingsView: View {
         case module(String)
     }
 
-    @State private var page: Page = .general
+    @Bindable private var router = SettingsRouter.shared
     private var registry: ModuleRegistry { AppState.shared.registry }
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $page) {
+            List(selection: $router.page) {
                 Section {
                     Label("General", systemImage: "gearshape").tag(Page.general)
                     Label("Behavior", systemImage: "cursorarrow.motionlines").tag(Page.behavior)
@@ -39,7 +39,7 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var detail: some View {
-        switch page {
+        switch router.page {
         case .general: GeneralSettingsView()
         case .behavior: BehaviorSettingsView()
         case .modules: ModulesSettingsView()

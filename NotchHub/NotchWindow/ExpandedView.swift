@@ -63,7 +63,6 @@ struct ExpandedView: View {
                     AppState.shared.openNotchNotes()
                 }
                 HeaderIconButton(icon: "gearshape.fill", help: "Settings") {
-                    actions.collapse()
                     SettingsOpener.open()
                 }
             }

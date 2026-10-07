@@ -88,7 +88,7 @@ private struct WeatherPlaceholder: View {
                         Button("Open Location Settings") { location.openSystemSettings() }
                             .buttonStyle(PillButtonStyle())
                     }
-                    Button("Set City…") { SettingsOpener.open() }.buttonStyle(PillButtonStyle())
+                    Button("Set City…") { SettingsOpener.open(page: .module("weather")) }.buttonStyle(PillButtonStyle())
                     Button("Retry") { Task { await module.refresh(force: true) } }
                         .buttonStyle(PillButtonStyle(prominent: true))
                 }
