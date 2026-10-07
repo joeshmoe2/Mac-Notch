@@ -22,6 +22,7 @@ final class AppState {
             ShelfModule(),
             WeatherModule(),
             AudioModule(),
+            CalendarModule(),
         ]
     }
 

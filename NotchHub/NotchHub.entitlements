@@ -8,5 +8,8 @@
 	<!-- Hardened Runtime / sandbox: allow CoreLocation for the Weather module. -->
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
+	<!-- Hardened Runtime / sandbox: allow EventKit for the Calendar and Reminders modules. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 </dict>
 </plist>
