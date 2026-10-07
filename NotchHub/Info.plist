@@ -12,6 +12,10 @@
 	<string>NotchHub shows your upcoming events and meeting links in the notch.</string>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>NotchHub shows your upcoming events and meeting links in the notch.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>NotchHub shows your reminders in the notch so you can check them off and add new ones.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>NotchHub shows your reminders in the notch so you can check them off and add new ones.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>NotchHub controls Music and Spotify to show what's playing and provide playback controls.</string>
 </dict>

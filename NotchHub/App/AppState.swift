@@ -23,6 +23,7 @@ final class AppState {
             WeatherModule(),
             AudioModule(),
             CalendarModule(),
+            RemindersModule(),
         ]
     }
 
