@@ -15,8 +15,19 @@ Move the cursor onto the notch and it springs open into a panel with tabs for:
 - **Clipboard**: history of copied text, links and images; click to copy again, pin favorites. *Off by default.* Passwords and copies from password managers are never saved.
 - **Mirror**: a camera preview to check yourself before a call. *Off by default.* The camera is on only while the tab is open.
 - **Quick Actions**: a grid of buttons that run your Apple Shortcuts.
+- **World Clocks**: your chosen cities with local time, a day/night icon and the offset from your time.
+- **Calculator**: type any expression (`(12 + 8) × 1.5`, `sqrt(2)`, `2^10`), copy the result, plus a unit converter (length, weight, temperature, volume, time) and optional currency rates.
+- **System**: CPU usage with a short graph, memory used and memory pressure. It only measures while you're looking at it.
 
 The **File Shelf** also picks up new screenshots automatically (Settings → Shelf). On first launch, a short **welcome window** explains the notch and asks for each permission one at a time (all skippable); reopen it from Settings → General.
+
+**Also:**
+
+- **Pop-ups**: plugging in or unplugging the charger briefly grows the notch to show battery level; connecting Bluetooth headphones or AirPods shows their name. Scrolling over the closed notch changes the volume.
+- **Gestures**: swipe left/right with two fingers on the open notch to switch tabs.
+- **Layout presets**: save your module order, Home dashboard and appearance as named presets (Settings → Presets) and switch between them from the menu bar icon.
+- **Notes search** in both the notch and NotchNotes.
+- **Accessibility**: VoiceOver labels on every control, Reduce Motion support (fades instead of springs), and font sizes up to 24 pt.
 
 There is also a **Home** dashboard that shows several modules at once. While the notch is collapsed, it can show small *live activities* on either side of the camera housing: album art with audio bars, a timer countdown, or a Pomodoro ring.
 
@@ -40,6 +51,33 @@ xcodebuild -project NotchHub.xcodeproj -scheme NotchHub -configuration Release b
 New `.swift` files you add anywhere under `NotchHub/` are picked up automatically. You don't need to edit `project.pbxproj`.
 
 The CI workflow `.github/workflows/build.yml` builds the project on a macOS runner for every push.
+
+### Downloading a ready-made build
+
+The **Release** workflow (`.github/workflows/release.yml`) builds a universal (Apple silicon + Intel) Release version and packages **NotchHub.app** and **NotchNotes.app** in a `.dmg`. It runs when you push a tag like `v1.0`, or by hand from the repository's **Actions → Release → Run workflow**. Download the `.dmg` from the run's **Artifacts** section.
+
+**Installing an unsigned build** (the default, when no signing secrets are set up):
+
+1. Open the `.dmg` and drag **NotchHub** (and **NotchNotes**, if you want it in Launchpad) to **Applications**.
+2. Open NotchHub. macOS will refuse with *"NotchHub" can't be opened* / *Apple could not verify…* — click **Done** (not Move to Trash).
+3. Open **System Settings → Privacy & Security**, scroll to the **Security** section, and click **Open Anyway** next to the message about NotchHub. Confirm with your password.
+4. Open NotchHub again and click **Open**. You only need to do this once per downloaded version (repeat for NotchNotes if you open it directly).
+
+**Making a fully signed, notarized release** (no Gatekeeper warning) requires a paid **Apple Developer Program** membership ($99/year). Then:
+
+1. In Xcode → Settings → Accounts → Manage Certificates, create a **Developer ID Application** certificate. Export it from Keychain Access as a `.p12` with a password.
+2. Create an **app-specific password** for your Apple ID at [appleid.apple.com](https://appleid.apple.com) (Sign-In and Security → App-Specific Passwords).
+3. Add these **repository secrets** (GitHub → Settings → Secrets and variables → Actions):
+
+   | Secret | Value |
+   |---|---|
+   | `DEVELOPER_ID_CERT_P12` | the `.p12` file, base64-encoded (`base64 -i cert.p12 \| pbcopy`) |
+   | `DEVELOPER_ID_CERT_PASSWORD` | the `.p12` password |
+   | `APPLE_TEAM_ID` | your 10-character Team ID (developer.apple.com → Membership) |
+   | `APPLE_ID` | the Apple ID email of your developer account |
+   | `APPLE_APP_PASSWORD` | the app-specific password from step 2 |
+
+   When all five are present, the workflow signs both apps with a secure timestamp and the Hardened Runtime, notarizes the `.dmg` with `notarytool`, and staples the ticket. If any is missing, it falls back to the unsigned build.
 
 NotchHub is an agent app (`LSUIElement`), so it has **no Dock icon**. Use the menu bar icon (▭) to toggle the notch, open Settings, or quit. The default global shortcut is **⌥⌘N**.
 
@@ -76,6 +114,10 @@ NotchNotes is a regular windowed note-taking app built from the same project (sc
 | Reminders | `NSRemindersUsageDescription`, `NSRemindersFullAccessUsageDescription` (same calendars entitlement) | Asked from the Reminders tab. |
 | Camera (Mirror) | `NSCameraUsageDescription`, entitlement `com.apple.security.device.camera` | Asked the first time the Mirror tab opens. |
 | Clipboard history | none | Reads the general pasteboard only while the module is enabled. |
+| Headphone pop-up | `NSBluetoothAlwaysUsageDescription` (+ `com.apple.security.device.bluetooth` for sandboxed builds) | macOS may ask once for Bluetooth access. |
+| Charger pop-up | none | IOKit power source notifications. |
+| System stats | none | Mach host statistics and `sysctl`, read only while the System tab/tile is visible. |
+| Currency rates | none | Optional HTTPS request to `api.frankfurter.app`, at most once a day. |
 | Screenshot shelf | none | Reads the screenshot location from `com.apple.screencapture` and watches that folder. |
 | Quick Actions | none | Runs `/usr/bin/shortcuts run "<name>"`. |
 | Launch at login | none | Uses `SMAppService.mainApp`. If macOS asks, approve NotchHub in *System Settings → General → Login Items*. |
@@ -118,9 +160,11 @@ NotchHub/
 │   ├── ModuleRegistry.swift          enable/order/home/live-activity priorities
 │   ├── Timer/  Pomodoro/  Notes/  FileShelf/  Weather/  Audio/
 │   ├── Calendar/  Reminders/  Clipboard/  Camera/  QuickActions/
+│   ├── WorldClocks/  Calculator/  SystemStats/
 ├── Services/            Location, Weather (Open-Meteo), Media (AppleScript), MediaRemote (optional),
 │                        AudioDevice (CoreAudio), Notifications, HotKey, AppleScriptRunner,
-│                        EventKit, PasteboardWatcher, Camera, ScreenshotWatcher, Shortcuts
+│                        EventKit, PasteboardWatcher, Camera, ScreenshotWatcher, Shortcuts,
+│                        PowerMonitor (IOKit), HeadphonesMonitor (IOBluetooth), SystemStats
 ├── Models/              CountdownTimer, Note, ShelfItem, WeatherModels, JSONStore
 ├── Settings/            Preferences (typed UserDefaults keys), SettingsView, SettingsTransfer
 └── Resources/           Assets
@@ -240,4 +284,12 @@ Because modules are `@Observable` classes, SwiftUI updates the tab, the Home til
 - **Website blocking uses `/etc/hosts`**, so it works in every browser but can be bypassed by a VPN or a browser's "secure DNS" (DNS-over-HTTPS) setting, and tabs already open may keep working until reloaded. It's a focus aid, not parental controls. True Screen Time–style blocking (like Opal) requires Apple's Family Controls entitlement, which Apple grants per developer.
 - **App blocking is "soft"**: a blocked app is hidden (or quit) as soon as it opens or comes to the front, but it isn't prevented from running in the background. Notification silencing depends on the two Shortcuts existing in the Shortcuts app.
 - **Live activities show one module at a time**, the highest-priority active one.
+- **Headphone battery isn't shown** in the connect pop-up: IOBluetooth has no public API for battery levels (AirPods' levels are only available through private APIs).
+- **The headphone pop-up only appears for devices that connect after NotchHub starts**, and only for Bluetooth audio-class devices (or names containing "AirPods").
+- **Swiping to switch tabs is disabled on the Shelf tab**, which scrolls horizontally itself. Swipe direction follows your trackpad's scrolling direction setting.
+- **Scroll-to-change-volume** needs an output device with software volume (some USB/HDMI outputs don't have one).
+- **Larger font sizes** scale text, buttons and icons, but some module layouts are fixed; raise the notch height (Settings → Appearance) if content is cut off.
+- **Layout presets** don't include module-specific settings (e.g. weather units) — only layout and appearance.
+- **Currency conversion** uses European Central Bank reference rates (updated on working days), not live market rates.
+- **System stats** are a snapshot of the whole Mac and approximate Activity Monitor's numbers; the "Memory used" figure follows the same app + wired + compressed formula.
 - **Launch at login** needs the app in `/Applications` (or another stable location) to behave reliably.
