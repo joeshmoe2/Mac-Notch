@@ -16,7 +16,9 @@ struct ExpandedView: View {
     private var sideWidth: CGFloat {
         let total = viewModel.currentSize.width - horizontalPadding * 2
         guard viewModel.geometry.isHardware else { return total / 2 }
-        return max(80, (total - viewModel.geometry.notchSize.width) / 2 - 6)
+        // Generous clearance: the notch's rounded corners reach a little past
+        // the area macOS reports, and nothing should hide underneath it.
+        return max(80, (total - viewModel.geometry.notchSize.width) / 2 - 14)
     }
 
     /// Falls back to Home if the selected module was disabled.
@@ -58,7 +60,8 @@ struct ExpandedView: View {
     private var tabLayout: (left: Int, width: CGFloat) {
         let count = tabs.count
         let preferred = 28 * min(max(fontSize / 13, 0.9), 1.4) + 2
-        let actionsWidth: CGFloat = 2 * 26 + 8
+        // Two 26 pt action buttons plus the 4 pt gaps around them and the spacer.
+        let actionsWidth: CGFloat = 2 * 26 + 3 * 4 + 2
         let rightSpace = max(0, sideWidth - actionsWidth)
         let width = min(preferred, max(18, (sideWidth + rightSpace) / CGFloat(max(count, 1))))
         let leftCapacity = max(1, Int(sideWidth / width))
@@ -100,7 +103,9 @@ struct ExpandedView: View {
                     SettingsOpener.open()
                 }
             }
-            .frame(width: sideWidth, alignment: .trailing)
+            // Leading alignment: if anything ever overflows, it spills away
+            // from the notch instead of underneath it.
+            .frame(width: sideWidth, alignment: .leading)
         }
     }
 
