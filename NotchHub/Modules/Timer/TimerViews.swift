@@ -73,7 +73,8 @@ private struct TimerRow: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(timer.isFinished ? "Done" : TimeFormat.clock(timer.remaining(at: context.date)))
                         .font(.system(size: 18, weight: .semibold).monospacedDigit())
-                    Text(timer.label).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Text(timer.finishedWhileClosed == true ? "\(timer.label) · finished while NotchHub was closed" : timer.label)
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
                 if !timer.isFinished {

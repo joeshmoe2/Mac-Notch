@@ -11,6 +11,8 @@ struct CountdownTimer: Identifiable, Codable, Equatable {
     /// Remaining time while paused (or not yet started).
     var pausedRemaining: TimeInterval
     var isFinished = false
+    /// True if the timer ran out while NotchHub wasn't running (set on relaunch).
+    var finishedWhileClosed: Bool? = nil
 
     init(label: String, duration: TimeInterval) {
         self.id = UUID()

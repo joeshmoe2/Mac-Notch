@@ -32,6 +32,11 @@ struct PomodoroExpandedView: View {
                 Label("\(module.completedToday) focus session\(module.completedToday == 1 ? "" : "s") today",
                       systemImage: "checkmark.seal.fill")
                     .foregroundStyle(.secondary)
+                if let finished = module.completedWhileClosed {
+                    Label("\(finished.title) finished while NotchHub was closed", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(finished.color)
+                }
                 FocusGuardStatus()
 
                 HStack(spacing: 8) {

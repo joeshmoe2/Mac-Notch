@@ -111,7 +111,8 @@ final class WebsiteBlocker {
 
     /// Removes any leftover block (e.g. after a crash) at launch.
     func cleanUpOnLaunch() {
-        if isInstalled { apply(blocking: false) }
+        // A focus session restored at launch re-applies its own block.
+        if isInstalled && !FocusGuard.shared.isActive { apply(blocking: false) }
     }
 
     // MARK: Install / uninstall (asks for an administrator password once)

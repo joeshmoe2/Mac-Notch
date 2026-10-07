@@ -17,6 +17,36 @@ final class TimerModule: NotchModule {
     @ObservationIgnored private var completionTasks: [UUID: Task<Void, Never>] = [:]
 
     static let presets: [Int] = [1, 5, 10, 15]
+    private static let fileName = "timers.json"
+
+    init() {
+        restore()
+    }
+
+    // MARK: Persistence
+
+    /// Timers are saved with their end dates (not tick counts), so time keeps
+    /// passing while NotchHub is quit. Timers that ran out meanwhile are shown
+    /// as finished on launch.
+    private func restore() {
+        guard var saved = JSONStore.load([CountdownTimer].self, from: Self.fileName) else { return }
+        let now = Date.now
+        for i in saved.indices {
+            if let end = saved[i].endDate, end <= now {
+                saved[i].endDate = nil
+                saved[i].pausedRemaining = 0
+                saved[i].isFinished = true
+                saved[i].finishedWhileClosed = true
+            }
+        }
+        timers = saved
+        for timer in timers where timer.isRunning { scheduleCompletion(for: timer) }
+        save()
+    }
+
+    private func save() {
+        JSONStore.save(timers, to: Self.fileName)
+    }
 
     // MARK: Actions
 
@@ -30,6 +60,7 @@ final class TimerModule: NotchModule {
         timer.endDate = .now.addingTimeInterval(duration)
         timers.append(timer)
         scheduleCompletion(for: timer)
+        save()
     }
 
     func pause(_ id: UUID) {
@@ -37,12 +68,14 @@ final class TimerModule: NotchModule {
         timers[i].pausedRemaining = timers[i].remaining()
         timers[i].endDate = nil
         cancelCompletion(id)
+        save()
     }
 
     func resume(_ id: UUID) {
         guard let i = index(id), !timers[i].isRunning, !timers[i].isFinished else { return }
         timers[i].endDate = .now.addingTimeInterval(timers[i].pausedRemaining)
         scheduleCompletion(for: timers[i])
+        save()
     }
 
     func reset(_ id: UUID) {
@@ -50,16 +83,20 @@ final class TimerModule: NotchModule {
         cancelCompletion(id)
         timers[i].endDate = nil
         timers[i].isFinished = false
+        timers[i].finishedWhileClosed = nil
         timers[i].pausedRemaining = timers[i].duration
+        save()
     }
 
     func remove(_ id: UUID) {
         cancelCompletion(id)
         timers.removeAll { $0.id == id }
+        save()
     }
 
     func clearFinished() {
         timers.removeAll { $0.isFinished }
+        save()
     }
 
     // MARK: Completion
@@ -88,6 +125,7 @@ final class TimerModule: NotchModule {
         timers[i].endDate = nil
         timers[i].pausedRemaining = 0
         completionTasks[id] = nil
+        save()
         NotificationService.shared.post(title: "Timer finished", body: timers[i].label)
         if Prefs.timerSound.value {
             NotificationService.shared.playSound(named: Prefs.timerSoundName.value)

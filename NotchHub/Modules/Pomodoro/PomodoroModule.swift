@@ -14,7 +14,7 @@ extension Prefs {
     static let pomodoroCompletedCount = PrefKey("pomodoro.stats.count", 0)
 }
 
-enum PomodoroPhase: String {
+enum PomodoroPhase: String, Codable {
     case work, shortBreak, longBreak
 
     var title: String {
@@ -61,11 +61,56 @@ final class PomodoroModule: NotchModule {
     /// True once the timer has been started in the current phase.
     private(set) var hasStarted = false
 
+    /// Set when a phase ran out while NotchHub was quit; shown until the next action.
+    private(set) var completedWhileClosed: PomodoroPhase?
+
     @ObservationIgnored private var phaseTask: Task<Void, Never>?
+    /// True while restoring saved state in `init` (no side effects then).
+    @ObservationIgnored private var isRestoring = false
+
+    private static let stateFile = "pomodoro-state.json"
+
+    /// What's saved between launches. The end date (not a tick count) is stored,
+    /// so time keeps passing while the app is closed.
+    private struct SavedState: Codable {
+        var phase: PomodoroPhase
+        var endDate: Date?
+        var pausedRemaining: TimeInterval
+        var sessionsInCycle: Int
+        var hasStarted: Bool
+    }
 
     init() {
         pausedRemaining = TimeInterval(PomodoroPhase.work.minutes * 60)
         loadStats()
+        restoreState()
+    }
+
+    private func restoreState() {
+        guard let saved = JSONStore.load(SavedState.self, from: Self.stateFile) else { return }
+        isRestoring = true
+        defer { isRestoring = false }
+        phase = saved.phase
+        sessionsInCycle = saved.sessionsInCycle
+        hasStarted = saved.hasStarted
+        pausedRemaining = saved.pausedRemaining
+        endDate = saved.endDate
+        if let end = saved.endDate {
+            if end > .now {
+                schedulePhaseEnd()
+            } else {
+                // Finished while we were closed: count it and move on, but don't auto-start.
+                completedWhileClosed = phase
+                advance(countCompleted: true, allowAutoStart: false)
+            }
+        }
+        persist()
+    }
+
+    private func persist() {
+        JSONStore.save(SavedState(phase: phase, endDate: endDate, pausedRemaining: pausedRemaining,
+                                  sessionsInCycle: sessionsInCycle, hasStarted: hasStarted),
+                       to: Self.stateFile)
     }
 
     var isRunning: Bool { endDate != nil }
@@ -86,6 +131,7 @@ final class PomodoroModule: NotchModule {
 
     func start() {
         guard !isRunning else { return }
+        completedWhileClosed = nil
         NotificationService.shared.requestAuthorizationIfNeeded()
         hasStarted = true
         endDate = .now.addingTimeInterval(pausedRemaining)
@@ -111,6 +157,7 @@ final class PomodoroModule: NotchModule {
     /// Back to the start of a fresh focus session.
     func reset() {
         phaseTask?.cancel()
+        completedWhileClosed = nil
         phase = .work
         sessionsInCycle = 0
         endDate = nil
@@ -152,7 +199,7 @@ final class PomodoroModule: NotchModule {
         }
     }
 
-    private func advance(countCompleted: Bool) {
+    private func advance(countCompleted: Bool, allowAutoStart: Bool = true) {
         phaseTask?.cancel()
         let wasRunning = isRunning
         if phase == .work {
@@ -167,14 +214,17 @@ final class PomodoroModule: NotchModule {
         endDate = nil
         hasStarted = false
         // Auto-start after a natural completion if enabled; keep running after a skip.
-        if (countCompleted && Prefs.pomodoroAutoStart.value) || (!countCompleted && wasRunning) {
+        if (countCompleted && allowAutoStart && Prefs.pomodoroAutoStart.value) || (!countCompleted && wasRunning) {
             start()
         }
         syncFocusGuard()
     }
 
-    /// App blocking / Focus mode is on only while a focus phase is actually running.
+    /// Saves state and turns app blocking / Focus mode on only while a focus phase is running.
     private func syncFocusGuard() {
+        persist()
+        // During init the registry (and AppState) don't exist yet; setActive(_:) applies it later.
+        guard !isRestoring else { return }
         FocusGuard.shared.setActive(isEnabled && phase == .work && isRunning, until: endDate)
     }
 
@@ -200,7 +250,8 @@ final class PomodoroModule: NotchModule {
     // MARK: NotchModule
 
     func setActive(_ active: Bool) {
-        if !active { FocusGuard.shared.setActive(false) }
+        // Also re-applies blocking for a focus session restored at launch.
+        FocusGuard.shared.setActive(active && phase == .work && isRunning, until: endDate)
     }
 
     func willExpand() {
