@@ -56,6 +56,7 @@ final class NotesStore {
         ensureFolder()
         reload()
         startWatching()
+        MarkdownCheatSheet.createIfNeeded(in: self)
         // Catch anything the watcher missed (e.g. a network or iCloud folder).
         activationObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main

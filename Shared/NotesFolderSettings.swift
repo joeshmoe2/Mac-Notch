@@ -19,6 +19,9 @@ struct NotesFolderSettings: View {
                 }
             }
         }
+        LabeledContent("Markdown help") {
+            Button("Restore Cheat Sheet Note") { _ = MarkdownCheatSheet.restore(in: store) }
+        }
         if let error = store.lastError {
             Text(error).font(.caption).foregroundStyle(.orange)
         }

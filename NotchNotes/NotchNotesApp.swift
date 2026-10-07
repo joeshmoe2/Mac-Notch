@@ -26,11 +26,30 @@ struct NotchNotesApp: App {
                     .disabled(model.selectedNote == nil)
             }
             CommandMenu("Format") {
-                Button("Insert Checkbox") { model.insertCheckbox() }
-                    .keyboardShortcut("l", modifiers: [.command, .shift])
-                    .disabled(model.selectedNote == nil)
-                Button(model.checklistMode ? "Edit as Text" : "Show as Checklist") { model.checklistMode.toggle() }
-                    .keyboardShortcut("k", modifiers: [.command, .shift])
+                Button("Bold") { MarkdownFormatting.apply(.bold) }.keyboardShortcut("b")
+                Button("Italic") { MarkdownFormatting.apply(.italic) }.keyboardShortcut("i")
+                Button("Strikethrough") { MarkdownFormatting.apply(.strikethrough) }.keyboardShortcut("x", modifiers: [.command, .shift])
+                Button("Highlight") { MarkdownFormatting.apply(.highlight) }.keyboardShortcut("h", modifiers: [.command, .shift])
+                Button("Inline Code") { MarkdownFormatting.apply(.code) }.keyboardShortcut("e")
+                Button("Link") { MarkdownFormatting.apply(.link) }.keyboardShortcut("k")
+                Divider()
+                Button("Heading 1") { MarkdownFormatting.apply(.heading(1)) }.keyboardShortcut("1", modifiers: [.command, .option])
+                Button("Heading 2") { MarkdownFormatting.apply(.heading(2)) }.keyboardShortcut("2", modifiers: [.command, .option])
+                Button("Heading 3") { MarkdownFormatting.apply(.heading(3)) }.keyboardShortcut("3", modifiers: [.command, .option])
+                Divider()
+                Button("Bulleted List") { MarkdownFormatting.apply(.bullet) }.keyboardShortcut("8", modifiers: [.command, .shift])
+                Button("Numbered List") { MarkdownFormatting.apply(.numbered) }.keyboardShortcut("7", modifiers: [.command, .shift])
+                Button("Checkbox") { model.insertCheckbox() }.keyboardShortcut("l", modifiers: [.command, .shift])
+                Button("Quote") { MarkdownFormatting.apply(.quote) }.keyboardShortcut("'", modifiers: [.command, .shift])
+            }
+            CommandGroup(after: .toolbar) {
+                Button("Edit") { model.viewMode = .edit }.keyboardShortcut("1")
+                Button("Split") { model.viewMode = .split }.keyboardShortcut("2")
+                Button("Preview") { model.viewMode = .preview }.keyboardShortcut("3")
+                Divider()
+            }
+            CommandGroup(replacing: .help) {
+                Button("Markdown Cheat Sheet") { model.openCheatSheet() }
             }
         }
 
@@ -47,11 +66,12 @@ final class NotesAppModel {
     let store = NotesStore()
     var selection: NoteID?
     var searchText = ""
-    var checklistMode = false
+    var viewMode: EditorMode = .split
     /// Note waiting for delete confirmation.
     var pendingDeleteID: NoteID?
 
     init() {
+        viewMode = EditorMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .split
         selection = store.notes.first?.id
         consumeOpenRequest()
     }
@@ -68,7 +88,7 @@ final class NotesAppModel {
 
     func newNote() {
         searchText = ""
-        checklistMode = false
+        if viewMode == .preview { viewMode = .split }
         selection = store.createNote().id
     }
 
@@ -93,10 +113,20 @@ final class NotesAppModel {
     }
 
     func insertCheckbox() {
+        if MarkdownFormatting.activeTextView != nil {
+            MarkdownFormatting.apply(.checkbox)
+            return
+        }
         guard let note = selectedNote else { return }
         let body = note.body.isEmpty || note.body.hasSuffix("\n") ? note.body + "- [ ] " : note.body + "\n- [ ] "
         store.update(note.id, body: body)
-        checklistMode = false
+        if viewMode == .preview { viewMode = .split }
+    }
+
+    func openCheatSheet() {
+        searchText = ""
+        selection = MarkdownCheatSheet.restore(in: store).id
+        if viewMode == .edit { viewMode = .split }
     }
 
     /// Selects the note NotchHub asked us to open ("Open in NotchNotes").
@@ -115,5 +145,18 @@ final class NotesAppModel {
         store.syncFolderWithSharedSetting()
         consumeOpenRequest()
         if selectedNote == nil { selection = store.notes.first?.id }
+    }
+}
+
+enum EditorMode: String, CaseIterable, Identifiable {
+    case edit, split, preview
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    var icon: String {
+        switch self {
+        case .edit: "pencil"
+        case .split: "rectangle.split.2x1"
+        case .preview: "eye"
+        }
     }
 }

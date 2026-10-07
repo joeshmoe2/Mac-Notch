@@ -2,7 +2,8 @@ import SwiftUI
 
 struct NotesExpandedView: View {
     @Bindable var module: NotesModule
-    @State private var checklistMode = false
+    /// Show the note rendered as Markdown instead of the raw text.
+    @State private var previewMode = false
     /// Delete needs two clicks: the first "arms" the trash button for a few seconds.
     @State private var armedDeleteID: NoteID?
     @AppStorage(Prefs.notesMonospaced) private var monospaced
@@ -80,11 +81,11 @@ struct NotesExpandedView: View {
                     IconButton(icon: "checklist", size: 10, help: "Insert checkbox") {
                         let body = note.body.isEmpty || note.body.hasSuffix("\n") ? note.body + "- [ ] " : note.body + "\n- [ ] "
                         module.update(note.id, body: body)
-                        checklistMode = false
+                        previewMode = false
                     }
-                    IconButton(icon: checklistMode ? "pencil" : "checkmark.square", size: 10,
-                               help: checklistMode ? "Edit text" : "Checklist view") {
-                        checklistMode.toggle()
+                    IconButton(icon: previewMode ? "pencil" : "eye", size: 10,
+                               help: previewMode ? "Edit text" : "Preview formatting") {
+                        previewMode.toggle()
                     }
                     IconButton(icon: note.id == module.pinnedID ? "pin.fill" : "pin", size: 10, help: "Pin to Home") {
                         module.setPinned(note.id == module.pinnedID ? nil : note.id)
@@ -101,8 +102,10 @@ struct NotesExpandedView: View {
                     }
                     .foregroundStyle(armedDeleteID == note.id ? Color.red : Color.primary)
                 }
-                if checklistMode {
-                    ChecklistView(note: note) { line in module.toggleCheckbox(noteID: note.id, line: line) }
+                if previewMode {
+                    MarkdownView(text: note.body, baseSize: fontSize, baseURL: module.store.folder) { line in
+                        module.toggleCheckbox(noteID: note.id, line: line)
+                    }
                 } else {
                     TextEditor(text: Binding(
                         get: { module.selected?.body ?? "" },
@@ -152,10 +155,11 @@ struct NotesCompactView: View {
             ModuleTileHeader(icon: module.pinned != nil ? "pin.fill" : "note.text",
                              title: note?.title ?? "Notes")
             if let note {
-                ChecklistView(note: note, compact: true) { line in
+                MarkdownView(text: note.body, baseSize: 11, baseURL: module.store.folder, compact: true) { line in
                     module.toggleCheckbox(noteID: note.id, line: line)
                 }
-                .font(.system(size: 11))
+                .frame(maxHeight: .infinity, alignment: .top)
+                .clipped()
             } else {
                 Text("No notes yet").foregroundStyle(.secondary)
             }

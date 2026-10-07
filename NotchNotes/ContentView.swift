@@ -39,6 +39,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.appDidBecomeActive()
         }
+        .onChange(of: model.viewMode) { _, mode in
+            UserDefaults.standard.set(mode.rawValue, forKey: "viewMode")
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             model.store.flushSaves()
         }
@@ -108,19 +111,18 @@ private struct NoteEditor: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if model.checklistMode {
-                ChecklistView(note: note) { line in store.toggleCheckbox(note.id, line: line) }
-                    .font(.system(size: fontSize))
-                    .padding(20)
-            } else {
-                TextEditor(text: Binding(
-                    get: { store.note(id: note.id)?.body ?? "" },
-                    set: { store.update(note.id, body: $0) }
-                ))
-                .font(monospaced ? .system(size: fontSize, design: .monospaced) : .system(size: fontSize))
-                .scrollContentBackground(.hidden)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
+            switch model.viewMode {
+            case .edit:
+                editor
+            case .preview:
+                preview
+            case .split:
+                HSplitView {
+                    editor.frame(minWidth: 220)
+                    preview
+                        .frame(minWidth: 220)
+                        .background(Color.primary.opacity(0.03))
+                }
             }
             Divider()
             footer
@@ -129,15 +131,41 @@ private struct NoteEditor: View {
         .navigationTitle(note.title)
         .navigationSubtitle(note.fileName)
         .toolbar {
+            ToolbarItem {
+                Menu {
+                    Button("Bold  ⌘B") { MarkdownFormatting.apply(.bold) }
+                    Button("Italic  ⌘I") { MarkdownFormatting.apply(.italic) }
+                    Button("Strikethrough  ⇧⌘X") { MarkdownFormatting.apply(.strikethrough) }
+                    Button("Highlight  ⇧⌘H") { MarkdownFormatting.apply(.highlight) }
+                    Button("Inline Code  ⌘E") { MarkdownFormatting.apply(.code) }
+                    Button("Link  ⌘K") { MarkdownFormatting.apply(.link) }
+                    Divider()
+                    Button("Heading 1") { MarkdownFormatting.apply(.heading(1)) }
+                    Button("Heading 2") { MarkdownFormatting.apply(.heading(2)) }
+                    Button("Heading 3") { MarkdownFormatting.apply(.heading(3)) }
+                    Divider()
+                    Button("Bulleted List") { MarkdownFormatting.apply(.bullet) }
+                    Button("Numbered List") { MarkdownFormatting.apply(.numbered) }
+                    Button("Checkbox") { model.insertCheckbox() }
+                    Button("Quote") { MarkdownFormatting.apply(.quote) }
+                    Divider()
+                    Button("Open Markdown Cheat Sheet") { model.openCheatSheet() }
+                } label: {
+                    Label("Format", systemImage: "textformat")
+                }
+                .help("Markdown formatting (place the cursor in the editor first)")
+                .disabled(model.viewMode == .preview)
+            }
+            ToolbarItem {
+                Picker("View", selection: $model.viewMode) {
+                    ForEach(EditorMode.allCases) { mode in
+                        Label(mode.title, systemImage: mode.icon).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .help("Edit, Split or Preview (⌘1 / ⌘2 / ⌘3)")
+            }
             ToolbarItemGroup {
-                Button { model.insertCheckbox() } label: {
-                    Label("Insert Checkbox", systemImage: "checklist")
-                }
-                .help("Insert Checkbox (⇧⌘L)")
-                Toggle(isOn: $model.checklistMode) {
-                    Label("Checklist View", systemImage: "checkmark.square")
-                }
-                .help("Toggle checklist view (⇧⌘K)")
                 ShareLink(item: store.url(for: note.fileName)) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
@@ -152,6 +180,28 @@ private struct NoteEditor: View {
                 .help("Move this note to the Trash")
             }
         }
+    }
+
+    private var editor: some View {
+        TextEditor(text: Binding(
+            get: { store.note(id: note.id)?.body ?? "" },
+            set: { store.update(note.id, body: $0) }
+        ))
+        .font(monospaced ? .system(size: fontSize, design: .monospaced) : .system(size: fontSize))
+        .scrollContentBackground(.hidden)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+    }
+
+    private var preview: some View {
+        MarkdownView(
+            text: store.note(id: note.id)?.body ?? note.body,
+            baseSize: fontSize,
+            baseURL: store.folder,
+            onToggleTask: { line in store.toggleCheckbox(note.id, line: line) }
+        )
+        .padding(.horizontal, 24)
+        .padding(.top, 16)
     }
 
     private var footer: some View {
