@@ -6,6 +6,16 @@ struct NotesExpandedView: View {
     @State private var previewMode = false
     /// Delete needs two clicks: the first "arms" the trash button for a few seconds.
     @State private var armedDeleteID: NoteID?
+    @State private var search = ""
+
+    /// Notes whose title or text contains the search (case- and accent-insensitive).
+    private var filteredNotes: [Note] {
+        let query = search.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return module.notes }
+        return module.notes.filter {
+            $0.title.localizedStandardContains(query) || $0.body.localizedStandardContains(query)
+        }
+    }
     @AppStorage(Prefs.notesMonospaced) private var monospaced
     @AppStorage(Prefs.notesLiveFormatting) private var liveFormatting
     @AppStorage(Prefs.accentColor) private var accentHex
@@ -43,11 +53,34 @@ struct NotesExpandedView: View {
             HStack {
                 Text("Notes").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 Spacer()
-                IconButton(icon: "plus", size: 10, help: "New note") { module.newNote() }
+                IconButton(icon: "plus", size: 10, help: "New note") {
+                    search = ""
+                    module.newNote()
+                }
             }
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass").font(.system(size: 10)).foregroundStyle(.secondary)
+                TextField("Search notes", text: $search)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11))
+                    .accessibilityLabel("Search notes")
+                if !search.isEmpty {
+                    Button { search = "" } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.white.opacity(0.06)))
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(module.notes) { note in
+                    if filteredNotes.isEmpty && !search.isEmpty {
+                        Text("No matches").font(.caption).foregroundStyle(.secondary).padding(6)
+                    }
+                    ForEach(filteredNotes) { note in
                         NoteListRow(note: note,
                                     selected: note.id == module.selectedID,
                                     pinned: note.id == module.pinnedID)

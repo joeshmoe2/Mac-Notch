@@ -84,7 +84,9 @@ final class NotesAppModel {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return store.notes }
         return store.notes.filter {
-            $0.body.localizedCaseInsensitiveContains(query) || $0.fileName.localizedCaseInsensitiveContains(query)
+            $0.title.localizedStandardContains(query)
+                || $0.body.localizedStandardContains(query)
+                || $0.fileName.localizedStandardContains(query)
         }
     }
 
