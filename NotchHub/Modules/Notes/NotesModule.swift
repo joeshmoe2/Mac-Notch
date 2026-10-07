@@ -5,6 +5,7 @@ extension Prefs {
     /// File name of the note pinned to Home.
     static let notesPinnedFile = PrefKey("notes.pinnedFile", "")
     static let notesMonospaced = PrefKey("notes.monospaced", false)
+    static let notesLiveFormatting = PrefKey("notes.liveFormatting", true)
 }
 
 /// Multi-note scratchpad. Notes are Markdown files in a user-visible folder

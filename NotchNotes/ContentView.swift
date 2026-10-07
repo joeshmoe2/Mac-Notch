@@ -106,6 +106,7 @@ private struct NoteEditor: View {
     let note: Note
     @AppStorage("editorFontSize") private var fontSize = 15.0
     @AppStorage("editorMonospaced") private var monospaced = false
+    @AppStorage("editorLiveFormatting") private var liveFormatting = true
 
     private var store: NotesStore { model.store }
 
@@ -183,14 +184,16 @@ private struct NoteEditor: View {
     }
 
     private var editor: some View {
-        TextEditor(text: Binding(
-            get: { store.note(id: note.id)?.body ?? "" },
-            set: { store.update(note.id, body: $0) }
-        ))
-        .font(monospaced ? .system(size: fontSize, design: .monospaced) : .system(size: fontSize))
-        .scrollContentBackground(.hidden)
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
+        MarkdownTextEditor(
+            text: Binding(
+                get: { store.note(id: note.id)?.body ?? "" },
+                set: { store.update(note.id, body: $0) }
+            ),
+            fontSize: fontSize,
+            monospaced: monospaced,
+            liveFormatting: liveFormatting,
+            inset: CGSize(width: 20, height: 14)
+        )
     }
 
     private var preview: some View {
@@ -221,6 +224,7 @@ struct NotchNotesSettings: View {
     let model: NotesAppModel
     @AppStorage("editorFontSize") private var fontSize = 15.0
     @AppStorage("editorMonospaced") private var monospaced = false
+    @AppStorage("editorLiveFormatting") private var liveFormatting = true
 
     var body: some View {
         Form {
@@ -235,6 +239,10 @@ struct NotchNotesSettings: View {
                     }
                 }
                 Toggle("Monospaced font", isOn: $monospaced)
+                Toggle("Format Markdown while typing", isOn: $liveFormatting)
+                Text("Headings, bold, italic, code, links, quotes and lists are styled as you type. Markdown symbols stay in the file but are dimmed. Click a [ ] box to tick it; Return continues a list.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

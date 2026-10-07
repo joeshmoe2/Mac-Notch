@@ -7,6 +7,7 @@ struct NotesExpandedView: View {
     /// Delete needs two clicks: the first "arms" the trash button for a few seconds.
     @State private var armedDeleteID: NoteID?
     @AppStorage(Prefs.notesMonospaced) private var monospaced
+    @AppStorage(Prefs.notesLiveFormatting) private var liveFormatting
     @Environment(\.notchFontSize) private var fontSize
 
     var body: some View {
@@ -107,12 +108,16 @@ struct NotesExpandedView: View {
                         module.toggleCheckbox(noteID: note.id, line: line)
                     }
                 } else {
-                    TextEditor(text: Binding(
-                        get: { module.selected?.body ?? "" },
-                        set: { module.update(note.id, body: $0) }
-                    ))
-                    .font(monospaced ? .system(size: fontSize, design: .monospaced) : .system(size: fontSize))
-                    .scrollContentBackground(.hidden)
+                    MarkdownTextEditor(
+                        text: Binding(
+                            get: { module.selected?.body ?? "" },
+                            set: { module.update(note.id, body: $0) }
+                        ),
+                        fontSize: fontSize,
+                        monospaced: monospaced,
+                        liveFormatting: liveFormatting,
+                        inset: CGSize(width: 6, height: 6)
+                    )
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
                 }
             }
@@ -174,9 +179,11 @@ struct NotesCompactView: View {
 struct NotesSettingsView: View {
     let module: NotesModule
     @AppStorage(Prefs.notesMonospaced) private var monospaced
+    @AppStorage(Prefs.notesLiveFormatting) private var liveFormatting
 
     var body: some View {
         Toggle("Monospaced font", isOn: $monospaced)
+        Toggle("Format Markdown while typing", isOn: $liveFormatting)
         Picker("Pinned note on Home", selection: Binding(
             get: { module.pinnedID },
             set: { module.setPinned($0) }
