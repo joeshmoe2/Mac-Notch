@@ -1,6 +1,7 @@
 import Foundation
 
 /// The "Markdown Cheat Sheet" note created the first time either app runs.
+@MainActor
 enum MarkdownCheatSheet {
     static let fileName = "Markdown Cheat Sheet.md"
     private static let createdKey = "markdownCheatSheetCreated"
