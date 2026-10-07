@@ -197,15 +197,28 @@ struct NotesCompactView: View {
         body.components(separatedBy: "\n").prefix(maxLines).joined(separator: "\n")
     }
 
+    /// Number of leading lines to skip because they only repeat the title
+    /// already shown in the tile header (e.g. "# Groceries").
+    static func titleLinesToSkip(_ body: String, title: String) -> Int {
+        let lines = body.components(separatedBy: "\n")
+        guard let index = lines.firstIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) else { return 0 }
+        let first = lines[index].trimmingCharacters(in: .whitespaces)
+        guard first.hasPrefix("#") else { return 0 }
+        return Note.title(for: first) == title ? index + 1 : 0
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             let note = module.pinned ?? module.notes.first
             ModuleTileHeader(icon: module.pinned != nil ? "pin.fill" : "note.text",
                              title: note?.title ?? "Notes")
             if let note {
+                let skip = Self.titleLinesToSkip(note.body, title: note.title)
+                let rest = note.body.components(separatedBy: "\n").dropFirst(skip).joined(separator: "\n")
                 // Only the start of the note fits in a tile; don't lay out the rest.
-                MarkdownView(text: Self.excerpt(note.body), baseSize: 11, baseURL: module.store.folder, compact: true) { line in
-                    module.toggleCheckbox(noteID: note.id, line: line)
+                // Line numbers are offset by `skip` so checkboxes toggle the right line.
+                MarkdownView(text: Self.excerpt(rest), baseSize: 11, baseURL: module.store.folder, compact: true) { line in
+                    module.toggleCheckbox(noteID: note.id, line: line + skip)
                 }
             } else {
                 Text("No notes yet").foregroundStyle(.secondary)

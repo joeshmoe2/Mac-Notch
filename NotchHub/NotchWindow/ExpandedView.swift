@@ -93,7 +93,7 @@ struct ExpandedView: View {
             HStack(spacing: 4) {
                 tabButtons(all.dropFirst(layout.left), width: layout.width)
                 Spacer(minLength: 0)
-                HeaderIconButton(icon: "note.text", help: "Open NotchNotes app") {
+                HeaderIconButton(icon: "arrow.up.forward.app", help: "Open NotchNotes app") {
                     AppState.shared.openNotchNotes()
                 }
                 HeaderIconButton(icon: "gearshape.fill", help: "Settings") {
