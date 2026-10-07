@@ -29,6 +29,7 @@ final class AppState {
             QuickActionsModule(),
             WorldClocksModule(),
             CalculatorModule(),
+            SystemStatsModule(),
         ]
     }
 
