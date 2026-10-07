@@ -27,6 +27,7 @@ final class AppState {
             ClipboardModule(),
             CameraModule(),
             QuickActionsModule(),
+            WorldClocksModule(),
         ]
     }
 
