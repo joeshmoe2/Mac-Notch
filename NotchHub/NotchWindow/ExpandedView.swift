@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Expanded hub: a header row (tabs left of the notch, actions right of it)
+/// Expanded hub: a header row (tabs split around the notch, actions on the right)
 /// and the selected module's content below.
 struct ExpandedView: View {
     let viewModel: NotchViewModel
@@ -38,27 +38,60 @@ struct ExpandedView: View {
         .foregroundStyle(.primary)
     }
 
-    private var header: some View {
-        HStack(spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
-                    TabButton(id: "home", icon: "square.grid.2x2.fill", title: "Home",
-                              selected: activeTab == "home", namespace: tabNamespace) {
-                        select("home")
-                    }
-                    ForEach(registry.enabled, id: \.id) { module in
-                        TabButton(id: module.id, icon: module.icon, title: module.name,
-                                  selected: activeTab == module.id, namespace: tabNamespace) {
-                            select(module.id)
-                        }
-                    }
+    /// Home plus every enabled module, in tab order.
+    private struct TabItem: Identifiable {
+        let id: String
+        let icon: String
+        let title: String
+    }
+
+    private var tabs: [TabItem] {
+        [TabItem(id: "home", icon: "square.grid.2x2.fill", title: "Home")]
+            + registry.enabled.map { TabItem(id: $0.id, icon: $0.icon, title: $0.name) }
+    }
+
+    @Environment(\.notchFontSize) private var fontSize
+
+    /// Tabs are split across both sides of the notch so they all stay visible:
+    /// the first half on the left, the rest on the right before the Notes/Settings
+    /// buttons. If they still don't fit, every tab shrinks a little.
+    private var tabLayout: (left: Int, width: CGFloat) {
+        let count = tabs.count
+        let preferred = 28 * min(max(fontSize / 13, 0.9), 1.4) + 2
+        let actionsWidth: CGFloat = 2 * 26 + 8
+        let rightSpace = max(0, sideWidth - actionsWidth)
+        let width = min(preferred, max(18, (sideWidth + rightSpace) / CGFloat(max(count, 1))))
+        let leftCapacity = max(1, Int(sideWidth / width))
+        let rightCapacity = Int(rightSpace / width)
+        let balanced = Int((Double(count) / 2).rounded(.up))
+        let left = min(max(balanced, count - rightCapacity), leftCapacity, count)
+        return (left, width - 2)
+    }
+
+    private func tabButtons(_ slice: ArraySlice<TabItem>, width: CGFloat) -> some View {
+        HStack(spacing: 2) {
+            ForEach(slice) { tab in
+                TabButton(id: tab.id, icon: tab.icon, title: tab.title, width: width,
+                          selected: activeTab == tab.id, namespace: tabNamespace) {
+                    select(tab.id)
                 }
             }
-            .frame(width: sideWidth, alignment: .leading)
+        }
+    }
+
+    private var header: some View {
+        let layout = tabLayout
+        let all = tabs
+        return HStack(spacing: 0) {
+            // Left of the notch.
+            tabButtons(all.prefix(layout.left), width: layout.width)
+                .frame(width: sideWidth, alignment: .leading)
 
             Spacer(minLength: 0)
 
+            // Right of the notch: remaining tabs, then actions.
             HStack(spacing: 4) {
+                tabButtons(all.dropFirst(layout.left), width: layout.width)
                 Spacer(minLength: 0)
                 HeaderIconButton(icon: "note.text", help: "Open NotchNotes app") {
                     AppState.shared.openNotchNotes()
@@ -93,6 +126,8 @@ private struct TabButton: View {
     let id: String
     let icon: String
     let title: String
+    /// Slot width chosen by the header so every tab fits.
+    var width: CGFloat = 28
     let selected: Bool
     let namespace: Namespace.ID
     let action: () -> Void
@@ -103,8 +138,8 @@ private struct TabButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 12 * fontScale, weight: .semibold))
-                .frame(width: 28 * fontScale, height: 24 * fontScale)
+                .font(.system(size: min(12 * fontScale, width * 0.45), weight: .semibold))
+                .frame(width: width, height: 24 * fontScale)
                 .foregroundStyle(selected ? Color.white : Color.secondary)
                 .background {
                     if selected {
