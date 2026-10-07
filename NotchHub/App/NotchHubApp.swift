@@ -25,6 +25,7 @@ private struct MenuBarContent: View {
     var body: some View {
         Button("Toggle Notch") { NotchWindowManager.shared.toggle() }
         Button("Open NotchNotes") { AppState.shared.openNotchNotes() }
+        LayoutPresetsMenu()
         Divider()
         Button("Settings…") { SettingsOpener.open() }
             .keyboardShortcut(",")

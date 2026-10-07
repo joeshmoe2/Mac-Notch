@@ -36,6 +36,7 @@ enum SettingsTransfer {
 
     private static func applyChanges() {
         AppState.shared.registry.reload()
+        LayoutPresetStore.shared.reload()
         NotchWindowManager.shared.rebuild()
         HotKeyService.shared.applyPreferences()
     }

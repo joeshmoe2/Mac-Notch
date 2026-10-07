@@ -4,7 +4,7 @@ import SwiftUI
 /// The app's Settings window (SwiftUI `Settings` scene).
 struct SettingsView: View {
     enum Page: Hashable {
-        case general, behavior, modules, appearance, backup
+        case general, behavior, modules, appearance, presets, backup
         case module(String)
     }
 
@@ -19,6 +19,7 @@ struct SettingsView: View {
                     Label("Behavior", systemImage: "cursorarrow.motionlines").tag(Page.behavior)
                     Label("Modules", systemImage: "square.grid.2x2").tag(Page.modules)
                     Label("Appearance", systemImage: "paintpalette").tag(Page.appearance)
+                    Label("Presets", systemImage: "rectangle.stack").tag(Page.presets)
                     Label("Backup & Reset", systemImage: "arrow.up.arrow.down.square").tag(Page.backup)
                 }
                 Section("Modules") {
@@ -44,6 +45,7 @@ struct SettingsView: View {
         case .behavior: BehaviorSettingsView()
         case .modules: ModulesSettingsView()
         case .appearance: AppearanceSettingsView()
+        case .presets: LayoutPresetsSettingsView()
         case .backup: BackupSettingsView()
         case .module(let id):
             if let module = registry.module(id: id) {
