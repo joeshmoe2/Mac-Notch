@@ -4,12 +4,19 @@ NotchHub turns the MacBook notch into an expandable widget hub, similar in spiri
 
 Move the cursor onto the notch and it springs open into a panel with tabs for:
 
-- **Timer**: run several timers at once.
+- **Timer**: run several timers at once. Running and paused timers survive quitting NotchHub.
 - **Pomodoro**: focus and break cycles. During focus it can show a full-screen block screen over distracting apps, block websites, and turn on a Focus (Do Not Disturb).
 - **Notes**: quick notes with checklists, saved as Markdown files you can see in Finder. They're shared with **NotchNotes**, a full-window companion app (see below).
 - **File Shelf**: a temporary drop zone for files.
 - **Weather**: current conditions and an hourly forecast.
 - **Now Playing**: Music and Spotify controls, volume and output device.
+- **Calendar (Next Up)**: today's and upcoming events by calendar color, a countdown beside the notch before the next event, and **Join** buttons for Zoom, Google Meet and Teams links.
+- **Reminders**: reminders from the lists you choose; tick them off or quick-add new ones with a due date.
+- **Clipboard**: history of copied text, links and images; click to copy again, pin favorites. *Off by default.* Passwords and copies from password managers are never saved.
+- **Mirror**: a camera preview to check yourself before a call. *Off by default.* The camera is on only while the tab is open.
+- **Quick Actions**: a grid of buttons that run your Apple Shortcuts.
+
+The **File Shelf** also picks up new screenshots automatically (Settings → Shelf). On first launch, a short **welcome window** explains the notch and asks for each permission one at a time (all skippable); reopen it from Settings → General.
 
 There is also a **Home** dashboard that shows several modules at once. While the notch is collapsed, it can show small *live activities* on either side of the camera housing: album art with audio bars, a timer countdown, or a Pomodoro ring.
 
@@ -64,7 +71,13 @@ NotchNotes is a regular windowed note-taking app built from the same project (sc
 | Location under the Hardened Runtime or sandbox | `com.apple.security.personal-information.location` | In `NotchHub.entitlements`. |
 | Controlling Music and Spotify | `NSAppleEventsUsageDescription` | macOS asks once per player ("NotchHub wants to control Spotify"). |
 | Apple Events under the Hardened Runtime | `com.apple.security.automation.apple-events` | In `NotchHub.entitlements`. |
-| Notifications | none | Requested the first time a timer or Pomodoro starts. |
+| Notifications | none | Requested during onboarding or the first time a timer or Pomodoro starts. |
+| Calendar | `NSCalendarsUsageDescription`, `NSCalendarsFullAccessUsageDescription`, entitlement `com.apple.security.personal-information.calendars` | Asked from the Calendar tab ("Allow Calendar Access"). If denied, the tab links to Privacy settings. |
+| Reminders | `NSRemindersUsageDescription`, `NSRemindersFullAccessUsageDescription` (same calendars entitlement) | Asked from the Reminders tab. |
+| Camera (Mirror) | `NSCameraUsageDescription`, entitlement `com.apple.security.device.camera` | Asked the first time the Mirror tab opens. |
+| Clipboard history | none | Reads the general pasteboard only while the module is enabled. |
+| Screenshot shelf | none | Reads the screenshot location from `com.apple.screencapture` and watches that folder. |
+| Quick Actions | none | Runs `/usr/bin/shortcuts run "<name>"`. |
 | Launch at login | none | Uses `SMAppService.mainApp`. If macOS asks, approve NotchHub in *System Settings → General → Login Items*. |
 | Pomodoro app blocking | none | Shows a full-screen block screen (or hides/quits the app) when a chosen app opens during a focus phase (NSWorkspace launch/activate notifications). |
 | Pomodoro website blocking | Administrator password, once | "Install Website Blocker" installs `/usr/local/libexec/notchhub-hosts` (root-owned) and `/etc/sudoers.d/notchhub`, which let NotchHub add/remove only its own marked `0.0.0.0 <domain>` block in `/etc/hosts`. Uninstall from the same settings page. |
@@ -104,8 +117,10 @@ NotchHub/
 │   ├── NotchModule.swift             the module protocol + LiveActivity
 │   ├── ModuleRegistry.swift          enable/order/home/live-activity priorities
 │   ├── Timer/  Pomodoro/  Notes/  FileShelf/  Weather/  Audio/
+│   ├── Calendar/  Reminders/  Clipboard/  Camera/  QuickActions/
 ├── Services/            Location, Weather (Open-Meteo), Media (AppleScript), MediaRemote (optional),
-│                        AudioDevice (CoreAudio), Notifications, HotKey, AppleScriptRunner
+│                        AudioDevice (CoreAudio), Notifications, HotKey, AppleScriptRunner,
+│                        EventKit, PasteboardWatcher, Camera, ScreenshotWatcher, Shortcuts
 ├── Models/              CountdownTimer, Note, ShelfItem, WeatherModels, JSONStore
 ├── Settings/            Preferences (typed UserDefaults keys), SettingsView, SettingsTransfer
 └── Resources/           Assets
@@ -129,6 +144,7 @@ NotchNotes/              The companion app: NotchNotesApp, ContentView, Assets
   - or a share sheet, menu or child window is open.
 
   Esc or a click elsewhere always closes it.
+- **Settings window.** Settings is a dedicated `NSWindow` (`SettingsWindowController`), not the SwiftUI `Settings` scene, which can't be opened reliably from an agent app's panel. While Settings or onboarding is open the app temporarily becomes a regular app (Dock icon, ⌘-Tab) so the window comes to the front, then goes back to menu-bar-only.
 - **Low idle CPU.** Nothing polls.
   - Timers and Pomodoro schedule one `Task.sleep` until their end date. Their views redraw with `TimelineView(.periodic)` only while visible.
   - Now Playing listens to Music and Spotify distributed notifications.
@@ -187,6 +203,7 @@ final class MyThingModule: NotchModule {
             Text("\(count)").monospacedDigit()
         }
     }
+    var enabledByDefault: Bool { true }      // false = starts switched off (privacy-sensitive)
     func setActive(_ active: Bool) { /* start/stop observers */ }
     func willExpand() { /* refresh stale data */ }
 }
@@ -216,7 +233,9 @@ Because modules are `@Observable` classes, SwiftUI updates the tab, the Home til
 - **Music artwork** comes back as raw data over AppleScript. Some streamed tracks have no artwork data, and a placeholder is shown.
 - **The notch geometry comes from public NSScreen APIs.** On a few scaled resolutions the overlay can be off by a point or two; it includes 2 pt of overdraw to hide this.
 - **Clicking inside the expanded notch while another app is in full screen** may briefly show the menu bar, which is macOS behavior for windows at menu-bar level.
-- **Timers aren't persisted across app restarts**, while the Pomodoro daily count is. Notes and the shelf are persisted.
+- **Timers and Pomodoro are saved with end dates**, so they keep counting while NotchHub is quit; anything that ran out meanwhile is shown as finished on launch (no notification is sent for it).
+- **Clipboard history polls `changeCount` every 0.5 s** while enabled — macOS has no pasteboard-change notification. Reading the counter is essentially free, and the timer has tolerance so the system can coalesce wake-ups.
+- **Calendar links** are detected for Zoom, Google Meet and Microsoft Teams URLs in the event's URL, location or notes; other services don't get a Join button.
 - **The shelf auto-clear check** runs when the notch opens and at launch, not on a background timer.
 - **Website blocking uses `/etc/hosts`**, so it works in every browser but can be bypassed by a VPN or a browser's "secure DNS" (DNS-over-HTTPS) setting, and tabs already open may keep working until reloaded. It's a focus aid, not parental controls. True Screen Time–style blocking (like Opal) requires Apple's Family Controls entitlement, which Apple grants per developer.
 - **App blocking is "soft"**: a blocked app is hidden (or quit) as soon as it opens or comes to the front, but it isn't prevented from running in the background. Notification silencing depends on the two Shortcuts existing in the Shortcuts app.
