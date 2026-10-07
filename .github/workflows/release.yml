@@ -1,5 +1,6 @@
 name: Release
 
+# Runs on v* tags or manually (Actions → Release → Run workflow).
 # Builds a Release configuration and packages NotchHub + NotchNotes into a .dmg.
 # - With Developer ID secrets: signs, notarizes and staples.
 # - Without them: produces an ad-hoc signed (unsigned for distribution) build.
@@ -15,8 +16,6 @@ on:
   workflow_dispatch:
   push:
     tags: ["v*"]
-    # Also run when the release workflow itself changes, so edits get tested.
-    paths: [".github/workflows/release.yml"]
 
 jobs:
   release:
