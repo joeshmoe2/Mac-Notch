@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct RemindersExpandedView: View {
@@ -5,11 +6,15 @@ struct RemindersExpandedView: View {
     @State private var newTitle = ""
     @State private var hasDueDate = false
     @State private var dueDate = Calendar.current.date(byAdding: .hour, value: 1, to: .now) ?? .now
+    @AppStorage(Prefs.remindersGoogleTasksButton) private var googleTasksButton
     private var service: EventKitService { .shared }
 
     var body: some View {
         if !service.hasReminderAccess {
-            EventKitPermissionView(reminders: true) { module.reload() }
+            EventKitPermissionView(reminders: true,
+                                   secondary: googleTasksButton ? (title: "Open Google Tasks", action: openGoogleTasks) : nil) {
+                module.reload()
+            }
         } else {
             VStack(alignment: .leading, spacing: 8) {
                 addRow
@@ -51,7 +56,15 @@ struct RemindersExpandedView: View {
                 .buttonStyle(PillButtonStyle(prominent: true))
                 .disabled(newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
                 .tooltip("Add reminder")
+            if googleTasksButton {
+                IconButton(icon: "checkmark.circle", help: "Open Google Tasks", action: openGoogleTasks)
+            }
         }
+    }
+
+    private func openGoogleTasks() {
+        if let url = URL(string: GoogleAppLink.tasks.url) { NSWorkspace.shared.open(url) }
+        AppState.shared.collapseNotch()
     }
 
     private func add() {
@@ -136,6 +149,7 @@ struct RemindersSettingsView: View {
     @AppStorage(Prefs.remindersHiddenLists) private var hidden
     @AppStorage(Prefs.remindersHideCompleted) private var hideCompleted
     @AppStorage(Prefs.remindersAddList) private var addList
+    @AppStorage(Prefs.remindersGoogleTasksButton) private var googleTasksButton
     private var service: EventKitService { .shared }
 
     var body: some View {
@@ -173,6 +187,10 @@ struct RemindersSettingsView: View {
         }
         Toggle("Hide completed reminders", isOn: $hideCompleted)
             .onChange(of: hideCompleted) { module.reload() }
+        Toggle("Show an \"Open Google Tasks\" button", isOn: $googleTasksButton)
+        Text("Google Tasks can't be shown inside NotchHub without signing in to Google, so this button opens it in your browser instead.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
         Button("Open Reminders") { module.openRemindersApp() }
     }
 }

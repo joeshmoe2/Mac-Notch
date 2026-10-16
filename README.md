@@ -10,11 +10,11 @@ Move the cursor onto the notch and it springs open into a panel with tabs for:
 - **File Shelf**: a temporary drop zone for files.
 - **Weather**: current conditions and an hourly forecast.
 - **Now Playing**: Music and Spotify controls, volume and output device.
-- **Calendar (Next Up)**: today's and upcoming events by calendar color, a countdown beside the notch before the next event, and **Join** buttons for Zoom, Google Meet and Teams links.
-- **Reminders**: reminders from the lists you choose; tick them off or quick-add new ones with a due date.
+- **Calendar (Next Up)**: today's and upcoming events by calendar color, a countdown beside the notch before the next event, and **Join** buttons for Zoom, Google Meet and Teams links. Shows **Google Calendar** too: add your Google account in *System Settings → Internet Accounts*, or paste a calendar's secret iCal link in *Settings → Calendar*.
+- **Reminders**: reminders from the lists you choose; tick them off or quick-add new ones with a due date. Optional **Open Google Tasks** button.
 - **Clipboard**: history of copied text, links and images; click to copy again, pin favorites. *Off by default.* Passwords and copies from password managers are never saved.
 - **Mirror**: a camera preview to check yourself before a call. *Off by default.* The camera is on only while the tab is open.
-- **Quick Actions**: a grid of buttons that run your Apple Shortcuts.
+- **Quick Actions**: a grid of buttons that run your Apple Shortcuts or open links, with one-click presets for Google apps (Gmail, Calendar, Drive, Docs, Sheets, Slides, Classroom, Tasks, Keep, Meet).
 - **World Clocks**: your chosen cities with local time, a day/night icon and the offset from your time.
 - **Calculator**: type any expression (`(12 + 8) × 1.5`, `sqrt(2)`, `2^10`), copy the result, plus a unit converter (length, weight, temperature, volume, time) and optional currency rates.
 - **System**: CPU usage with a short graph, memory used and memory pressure. It only measures while you're looking at it.
@@ -119,7 +119,8 @@ NotchNotes is a regular windowed note-taking app built from the same project (sc
 | System stats | none | Mach host statistics and `sysctl`, read only while the System tab/tile is visible. |
 | Currency rates | none | Optional HTTPS request to `api.frankfurter.app`, at most once a day. |
 | Screenshot shelf | none | Reads the screenshot location from `com.apple.screencapture` and watches that folder. |
-| Quick Actions | none | Runs `/usr/bin/shortcuts run "<name>"`. |
+| Quick Actions | none | Runs `/usr/bin/shortcuts run "<name>"`, or opens a link in the default browser. |
+| Linked Google calendars | none | HTTPS download of each iCal link you add, when the notch opens (at most every 5 minutes) and every 30 minutes while the Calendar module is on. |
 | Launch at login | none | Uses `SMAppService.mainApp`. If macOS asks, approve NotchHub in *System Settings → General → Login Items*. |
 | Pomodoro app blocking | none | Shows a full-screen block screen (or hides/quits the app) when a chosen app opens during a focus phase (NSWorkspace launch/activate notifications). |
 | Pomodoro website blocking | Administrator password, once | "Install Website Blocker" installs `/usr/local/libexec/notchhub-hosts` (root-owned) and `/etc/sudoers.d/notchhub`, which let NotchHub add/remove only its own marked `0.0.0.0 <domain>` block in `/etc/hosts`. Uninstall from the same settings page. |
@@ -280,6 +281,7 @@ Because modules are `@Observable` classes, SwiftUI updates the tab, the Home til
 - **Timers and Pomodoro are saved with end dates**, so they keep counting while NotchHub is quit; anything that ran out meanwhile is shown as finished on launch (no notification is sent for it).
 - **Clipboard history polls `changeCount` every 0.5 s** while enabled — macOS has no pasteboard-change notification. Reading the counter is essentially free, and the timer has tolerance so the system can coalesce wake-ups.
 - **Calendar links** are detected for Zoom, Google Meet and Microsoft Teams URLs in the event's URL, location or notes; other services don't get a Join button.
+- **Google without signing in.** NotchHub doesn't sign in to Google itself (that needs a Google Cloud OAuth client). Google Calendar works through macOS Internet Accounts (full support) or a secret iCal link (read-only; supports the usual daily/weekly/monthly/yearly repeats, exceptions and moved occurrences). **Google Tasks has no link-based feed**, so it can only be opened in the browser. School or work Google accounts may block Internet Accounts or hide the secret iCal address; that's an administrator setting.
 - **The shelf auto-clear check** runs when the notch opens and at launch, not on a background timer.
 - **Website blocking uses `/etc/hosts`**, so it works in every browser but can be bypassed by a VPN or a browser's "secure DNS" (DNS-over-HTTPS) setting, and tabs already open may keep working until reloaded. It's a focus aid, not parental controls. True Screen Time–style blocking (like Opal) requires Apple's Family Controls entitlement, which Apple grants per developer.
 - **App blocking is "soft"**: a blocked app is hidden (or quit) as soon as it opens or comes to the front, but it isn't prevented from running in the background. Notification silencing depends on the two Shortcuts existing in the Shortcuts app.

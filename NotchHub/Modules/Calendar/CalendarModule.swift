@@ -36,7 +36,10 @@ enum MeetingLinkDetector {
     ].compactMap { try? NSRegularExpression(pattern: $0, options: .caseInsensitive) }
 
     static func find(in event: EKEvent) -> URL? {
-        let candidates = [event.url?.absoluteString, event.location, event.notes].compactMap { $0 }
+        find(inTexts: [event.url?.absoluteString, event.location, event.notes].compactMap { $0 })
+    }
+
+    static func find(inTexts candidates: [String]) -> URL? {
         for text in candidates {
             let range = NSRange(text.startIndex..., in: text)
             for regex in patterns {
@@ -74,8 +77,10 @@ final class CalendarModule: NotchModule {
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var boundaryTask: Task<Void, Never>?
     @ObservationIgnored private var changeObservation: Task<Void, Never>?
+    @ObservationIgnored private var feedRefreshTask: Task<Void, Never>?
 
     private var service: EventKitService { .shared }
+    private var feeds: ICalFeedService { .shared }
     private static let ongoingGrace: TimeInterval = 5 * 60
 
     // MARK: Lifecycle
@@ -85,7 +90,17 @@ final class CalendarModule: NotchModule {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers.removeAll()
         boundaryTask?.cancel()
+        feedRefreshTask?.cancel()
         guard active else { events = []; return }
+        // Linked calendars (Google iCal links): refresh every 30 minutes while active.
+        feedRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await ICalFeedService.shared.refreshIfStale(maxAge: 25 * 60)
+                guard !Task.isCancelled else { return }
+                self?.reload()
+                try? await Task.sleep(for: .seconds(30 * 60))
+            }
+        }
         observers.append(NotificationCenter.default.addObserver(
             forName: .EKEventStoreChanged, object: nil, queue: .main
         ) { _ in
@@ -103,12 +118,27 @@ final class CalendarModule: NotchModule {
     func willExpand() {
         service.refreshStatus()
         reload()
+        Task { [weak self] in
+            await ICalFeedService.shared.refreshIfStale()
+            self?.reload()
+        }
     }
+
+    /// Re-downloads linked calendars now (after editing them in settings).
+    func refreshFeeds() {
+        Task { [weak self] in
+            await ICalFeedService.shared.refresh()
+            self?.reload()
+        }
+    }
+
+    /// True when there's something to show: Apple Calendar access or a linked calendar.
+    var hasAnySource: Bool { service.hasEventAccess || feeds.hasActiveFeeds }
 
     // MARK: Loading
 
     func reload() {
-        guard active, service.hasEventAccess else {
+        guard active else {
             events = []
             return
         }
@@ -116,14 +146,24 @@ final class CalendarModule: NotchModule {
         let start = calendar.startOfDay(for: .now)
         let days = min(max(Prefs.calendarDays.value, 1), 14)
         guard let end = calendar.date(byAdding: .day, value: days, to: start) else { return }
+        let showAllDay = Prefs.calendarShowAllDay.value
+        let loaded = (appleEvents(from: start, to: end) + feeds.events(from: start, to: end))
+            .filter { showAllDay || !$0.isAllDay }
+            .sorted { ($0.isAllDay ? 0 : 1, $0.start) < ($1.isAllDay ? 0 : 1, $1.start) }
+        if loaded != events { events = loaded }
+        clock = .now
+        scheduleNextBoundary()
+    }
+
+    /// Events from Apple Calendar (which also includes Google accounts added in
+    /// System Settings → Internet Accounts).
+    private func appleEvents(from start: Date, to end: Date) -> [CalendarEvent] {
+        guard service.hasEventAccess else { return [] }
         let hidden = Set(Prefs.calendarHidden.value.idList)
         let calendars = service.store.calendars(for: .event).filter { !hidden.contains($0.calendarIdentifier) }
-        guard !calendars.isEmpty else { events = []; return }
-
+        guard !calendars.isEmpty else { return [] }
         let predicate = service.store.predicateForEvents(withStart: start, end: end, calendars: calendars)
-        let showAllDay = Prefs.calendarShowAllDay.value
-        let loaded = service.store.events(matching: predicate)
-            .filter { showAllDay || !$0.isAllDay }
+        return service.store.events(matching: predicate)
             .map { event in
                 CalendarEvent(
                     id: (event.eventIdentifier ?? UUID().uuidString) + "\(event.startDate.timeIntervalSince1970)",
@@ -137,10 +177,6 @@ final class CalendarModule: NotchModule {
                     meetingURL: MeetingLinkDetector.find(in: event)
                 )
             }
-            .sorted { ($0.isAllDay ? 0 : 1, $0.start) < ($1.isAllDay ? 0 : 1, $1.start) }
-        if loaded != events { events = loaded }
-        clock = .now
-        scheduleNextBoundary()
     }
 
     // MARK: Next up

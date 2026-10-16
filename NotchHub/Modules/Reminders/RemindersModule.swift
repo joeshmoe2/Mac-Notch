@@ -6,6 +6,8 @@ extension Prefs {
     /// Reminder list identifiers the user turned off (comma separated).
     static let remindersHiddenLists = PrefKey("reminders.hiddenLists", "")
     static let remindersHideCompleted = PrefKey("reminders.hideCompleted", true)
+    /// Show a button that opens Google Tasks in the browser.
+    static let remindersGoogleTasksButton = PrefKey("reminders.googleTasksButton", false)
     /// List used for quick-add ("" = the default Reminders list).
     static let remindersAddList = PrefKey("reminders.addList", "")
 }

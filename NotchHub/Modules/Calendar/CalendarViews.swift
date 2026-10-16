@@ -4,6 +4,8 @@ import SwiftUI
 /// Shown when calendar or reminders access hasn't been granted.
 struct EventKitPermissionView: View {
     let reminders: Bool
+    /// Extra button under the main one (e.g. "Link Google Calendar…").
+    var secondary: (title: String, action: () -> Void)? = nil
     let onGranted: () -> Void
     private var service: EventKitService { .shared }
 
@@ -34,6 +36,10 @@ struct EventKitPermissionView: View {
                 }
                 .buttonStyle(PillButtonStyle(prominent: true))
             }
+            if let secondary {
+                Button(secondary.title, action: secondary.action)
+                    .buttonStyle(PillButtonStyle())
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -57,8 +63,10 @@ struct CalendarExpandedView: View {
     }
 
     var body: some View {
-        if !service.hasEventAccess {
-            EventKitPermissionView(reminders: false) { module.reload() }
+        if !module.hasAnySource {
+            EventKitPermissionView(reminders: false, secondary: (title: "Link Google Calendar…", action: {
+                SettingsOpener.open(page: .module(module.id))
+            })) { module.reload() }
         } else if module.events.isEmpty {
             VStack(spacing: 6) {
                 Image(systemName: "calendar").font(.system(size: 26)).foregroundStyle(.secondary)
@@ -148,7 +156,7 @@ struct CalendarCompactView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ModuleTileHeader(icon: "calendar", title: "Next Up")
-            if !service.hasEventAccess {
+            if !module.hasAnySource {
                 Text("Allow access in the Calendar tab").font(.caption).foregroundStyle(.secondary)
             } else if let next = module.nextEvent(at: module.clock) {
                 HStack(spacing: 6) {
@@ -223,5 +231,102 @@ struct CalendarSettingsView: View {
         Text("Zoom, Google Meet and Microsoft Teams links in an event get a Join button.")
             .font(.caption)
             .foregroundStyle(.secondary)
+        GoogleCalendarSettings(module: module)
+    }
+}
+
+/// Two ways to see Google Calendar without signing in to Google inside NotchHub.
+private struct GoogleCalendarSettings: View {
+    let module: CalendarModule
+    private var feeds: ICalFeedService { .shared }
+
+    var body: some View {
+        Group {
+            Text("Google Calendar").font(.headline).padding(.top, 6)
+            LabeledContent("Best: add your Google account to the Mac") {
+                Button("Open Internet Accounts") { openInternetAccounts() }
+            }
+            Text("System Settings → Internet Accounts → Add Account → Google, and turn on Calendars. Your Google calendars then show up in the list above (and in Apple Calendar), with no extra setup here.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            ForEach(feeds.feeds) { feed in
+                ICalFeedEditor(module: module, feed: feed)
+            }
+            HStack {
+                Button("Add Google Calendar Link") { feeds.add() }
+                Button("Open Google Calendar Settings") {
+                    if let url = URL(string: "https://calendar.google.com/calendar/r/settings") { NSWorkspace.shared.open(url) }
+                }
+                if !feeds.feeds.isEmpty {
+                    Button("Refresh Now") { module.refreshFeeds() }
+                }
+            }
+            Text("Or link one calendar: in Google Calendar on the web open Settings, click the calendar on the left, scroll to \"Integrate calendar\" and copy the \"Secret address in iCal format\". Linked calendars are read-only and refresh every 30 minutes. Keep the link private: anyone who has it can see that calendar. School accounts sometimes hide this option; use Internet Accounts instead.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func openInternetAccounts() {
+        let urls = ["x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension",
+                    "x-apple.systempreferences:com.apple.preferences.internetaccounts"]
+        for string in urls {
+            if let url = URL(string: string), NSWorkspace.shared.open(url) { return }
+        }
+    }
+}
+
+private struct ICalFeedEditor: View {
+    let module: CalendarModule
+    let feed: ICalFeed
+    private var feeds: ICalFeedService { .shared }
+
+    private func binding<T>(_ keyPath: WritableKeyPath<ICalFeed, T>) -> Binding<T> {
+        Binding(
+            get: { feed[keyPath: keyPath] },
+            set: { value in
+                var updated = feed
+                updated[keyPath: keyPath] = value
+                feeds.update(updated)
+                module.reload()
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Toggle("", isOn: binding(\.enabled)).labelsHidden()
+                    .help("Show this calendar")
+                ColorPicker("", selection: Binding(
+                    get: { Color(hex: feed.colorHex) ?? .blue },
+                    set: { binding(\.colorHex).wrappedValue = $0.hexString }
+                ), supportsOpacity: false)
+                .labelsHidden()
+                .help("Calendar color")
+                TextField("Name", text: binding(\.name))
+                    .frame(width: 150)
+                TextField("https://calendar.google.com/calendar/ical/…/basic.ics", text: binding(\.url))
+                    .onSubmit { module.refreshFeeds() }
+                Button(role: .destructive) {
+                    feeds.remove(feed.id)
+                    module.reload()
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .help("Remove this calendar link")
+            }
+            if let error = feeds.errors[feed.id] {
+                Text(error).font(.caption).foregroundStyle(.orange)
+            } else if let events = feeds.parsed[feed.id] {
+                Text("Linked · \(events.count) event\(events.count == 1 ? "" : "s") loaded")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !feed.url.isEmpty {
+                Text("Press Return or Refresh Now to load it.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 }

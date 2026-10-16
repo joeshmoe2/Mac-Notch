@@ -7,7 +7,7 @@ struct QuickActionsExpandedView: View {
         if module.actions.isEmpty {
             VStack(spacing: 8) {
                 Image(systemName: "square.grid.3x2").font(.system(size: 26)).foregroundStyle(.secondary)
-                Text("Add buttons that run your Shortcuts.").foregroundStyle(.secondary)
+                Text("Add buttons that run your Shortcuts or open Google apps.").foregroundStyle(.secondary)
                 Button("Set Up Quick Actions") { SettingsOpener.open(page: .module(module.id)) }
                     .buttonStyle(PillButtonStyle(prominent: true))
             }
@@ -71,6 +71,7 @@ private struct QuickActionTile: View {
 
     private var tooltip: String {
         if case .failed(let message) = state { return message }
+        if action.isLink { return "Open \(action.linkURL?.host() ?? "link")" }
         return "Run “\(action.shortcut)”"
     }
 }
@@ -105,12 +106,24 @@ struct QuickActionsSettingsView: View {
             QuickActionEditor(module: module, action: action)
         }
         HStack {
-            Button("Add Action") { module.add() }
+            Button("Add Shortcut") { module.add() }
+            Menu("Add Google App") {
+                ForEach(GoogleAppLink.allCases) { app in
+                    Button {
+                        module.addLink(app)
+                    } label: {
+                        Label(app.title, systemImage: app.symbol)
+                    }
+                }
+                Divider()
+                Button("Other Link…") { module.addLink() }
+            }
+            .fixedSize()
             Button("Open Shortcuts") { ShortcutsService.openShortcutsApp() }
             Button("Reload Shortcut List") { Task { await module.refreshShortcutList() } }
         }
         .task { await module.refreshShortcutList() }
-        Text("Each button runs one of your Apple Shortcuts. Symbols are SF Symbol names, e.g. “lightbulb.fill”, “moon.fill” or “music.note”.")
+        Text("Each button runs one of your Apple Shortcuts or opens a link in your browser. Google apps open with whichever Google account you're signed in to there. Symbols are SF Symbol names, e.g. “lightbulb.fill”, “moon.fill” or “music.note”.")
             .font(.caption)
             .foregroundStyle(.secondary)
     }
@@ -142,7 +155,16 @@ private struct QuickActionEditor: View {
                     TextField("SF Symbol", text: binding(\.symbol))
                         .frame(width: 130)
                 }
-                if module.availableShortcuts.isEmpty {
+                if action.isLink {
+                    TextField("Link", text: Binding(
+                        get: { action.url ?? "" },
+                        set: { value in
+                            var updated = action
+                            updated.url = value
+                            module.update(updated)
+                        }
+                    ))
+                } else if module.availableShortcuts.isEmpty {
                     TextField("Shortcut name", text: binding(\.shortcut))
                 } else {
                     Picker("Shortcut", selection: binding(\.shortcut)) {
