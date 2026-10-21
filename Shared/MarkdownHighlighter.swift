@@ -45,7 +45,33 @@ struct MarkdownHighlighter {
 
     // MARK: Apply
 
+    /// Styles `storage`, touching only the ranges whose attributes actually change.
+    ///
+    /// Restyling everything on each keystroke made the text view re-lay out the
+    /// whole note, which shifted line heights and made the view jump up and down
+    /// while typing (most noticeably on Space, when a word's style settles).
     func apply(to storage: NSTextStorage) {
+        let styled = NSMutableAttributedString(string: storage.string)
+        render(into: styled)
+        let full = NSRange(location: 0, length: styled.length)
+        guard storage.length == styled.length else { return }
+        styled.enumerateAttributes(in: full) { wanted, run, _ in
+            var location = run.location
+            while location < NSMaxRange(run) {
+                var existingRange = NSRange()
+                let existing = storage.attributes(at: location, longestEffectiveRange: &existingRange, in: run)
+                // `existingRange` is clipped to `run` and contains `location`.
+                let end = max(NSMaxRange(existingRange), location + 1)
+                let piece = NSRange(location: location, length: min(end, NSMaxRange(run)) - location)
+                if !(existing as NSDictionary).isEqual(to: wanted) {
+                    storage.setAttributes(wanted, range: piece)
+                }
+                location = NSMaxRange(piece)
+            }
+        }
+    }
+
+    private func render(into storage: NSMutableAttributedString) {
         let text = storage.string as NSString
         let full = NSRange(location: 0, length: text.length)
         let paragraph = NSMutableParagraphStyle()
@@ -78,7 +104,7 @@ struct MarkdownHighlighter {
         applyInline(storage: storage, text: text, excluding: codeRanges)
     }
 
-    private func styleLine(_ line: String, range: NSRange, storage: NSTextStorage,
+    private func styleLine(_ line: String, range: NSRange, storage: NSMutableAttributedString,
                            inFence: inout Bool, codeRanges: inout [NSRange]) {
         let local = NSRange(location: 0, length: (line as NSString).length)
 
@@ -154,7 +180,7 @@ struct MarkdownHighlighter {
         }
     }
 
-    private func applyInline(storage: NSTextStorage, text: NSString, excluding code: [NSRange]) {
+    private func applyInline(storage: NSMutableAttributedString, text: NSString, excluding code: [NSRange]) {
         let full = NSRange(location: 0, length: text.length)
         let string = text as String
         func outsideCode(_ r: NSRange) -> Bool {
@@ -215,20 +241,20 @@ struct MarkdownHighlighter {
         NSRange(location: r.location + delta, length: r.length)
     }
 
-    private func dim(_ r: NSRange, _ storage: NSTextStorage) {
+    private func dim(_ r: NSRange, _ storage: NSMutableAttributedString) {
         guard r.length > 0 else { return }
         storage.addAttribute(.foregroundColor, value: markerColor, range: r)
     }
 
     /// Dims the delimiter characters around group 2 of a match.
-    private func dimMarkers(_ m: NSTextCheckingResult, _ storage: NSTextStorage) {
+    private func dimMarkers(_ m: NSTextCheckingResult, _ storage: NSMutableAttributedString) {
         let whole = m.range
         let inner = m.range(at: 2)
         dim(NSRange(location: whole.location, length: inner.location - whole.location), storage)
         dim(NSRange(location: NSMaxRange(inner), length: NSMaxRange(whole) - NSMaxRange(inner)), storage)
     }
 
-    private func addTrait(_ trait: NSFontTraitMask, range: NSRange, _ storage: NSTextStorage) {
+    private func addTrait(_ trait: NSFontTraitMask, range: NSRange, _ storage: NSMutableAttributedString) {
         storage.enumerateAttribute(.font, in: range) { value, sub, _ in
             let font = (value as? NSFont) ?? baseFont
             let converted = NSFontManager.shared.convert(font, toHaveTrait: trait)
@@ -236,7 +262,7 @@ struct MarkdownHighlighter {
         }
     }
 
-    private func italicize(_ range: NSRange, _ storage: NSTextStorage) {
+    private func italicize(_ range: NSRange, _ storage: NSMutableAttributedString) {
         addTrait(.italicFontMask, range: range, storage)
     }
 }

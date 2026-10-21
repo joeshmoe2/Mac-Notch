@@ -47,6 +47,9 @@ struct MarkdownTextEditor: NSViewRepresentable {
         textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         textView.delegate = context.coordinator
         textView.textStorage?.delegate = context.coordinator
+        // Lay out the whole note so line heights never have to be estimated
+        // (estimates made the view jump while typing).
+        textView.layoutManager?.allowsNonContiguousLayout = false
         textView.string = text
 
         scrollView.documentView = textView
