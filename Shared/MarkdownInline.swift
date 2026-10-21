@@ -11,7 +11,7 @@ enum MarkdownInline {
         var result = AttributedString()
         // Split into plain runs and our extension tokens.
         let pattern = #"==(.+?)==|(?<!~)~(?!~)([^~\s]+)~(?!~)|\^([^\^\s]+)\^|\[\^([^\]]+)\]"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+        guard let regex = MarkdownParser.cachedRegex(pattern) else {
             return foundation(source)
         }
         let ns = source as NSString
@@ -61,7 +61,7 @@ enum MarkdownInline {
 
     static func replaceEmoji(in text: String) -> String {
         guard text.contains(":") else { return text }
-        guard let regex = try? NSRegularExpression(pattern: #":([a-z0-9_+\-]+):"#) else { return text }
+        guard let regex = MarkdownParser.cachedRegex(#":([a-z0-9_+\-]+):"#) else { return text }
         let ns = text as NSString
         var output = ""
         var cursor = 0

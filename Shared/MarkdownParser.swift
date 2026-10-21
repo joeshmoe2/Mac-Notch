@@ -239,9 +239,20 @@ enum MarkdownParser {
         return t.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespaces) }
     }
 
+    /// Compiled patterns, so re-rendering a note on every keystroke doesn't
+    /// recompile the same regexes for every line. NSCache is thread-safe.
+    private static let regexCache = NSCache<NSString, NSRegularExpression>()
+
+    static func cachedRegex(_ pattern: String) -> NSRegularExpression? {
+        if let cached = regexCache.object(forKey: pattern as NSString) { return cached }
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+        regexCache.setObject(regex, forKey: pattern as NSString)
+        return regex
+    }
+
     /// Returns capture groups (index 0 = whole match) for the first match.
     static func firstMatch(_ pattern: String, in text: String) -> [String]? {
-        guard let regex = try? NSRegularExpression(pattern: pattern),
+        guard let regex = cachedRegex(pattern),
               let m = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else { return nil }
         return (0..<m.numberOfRanges).map { idx in
             guard let r = Range(m.range(at: idx), in: text) else { return "" }

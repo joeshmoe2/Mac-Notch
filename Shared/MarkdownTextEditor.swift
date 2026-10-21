@@ -25,7 +25,9 @@ struct MarkdownTextEditor: NSViewRepresentable {
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
 
-        let textView = MarkdownNSTextView()
+        // TextKit 1: restyling the whole note on every edit is a well-trodden path
+        // there, while TextKit 2 can crash when attributes change outside the edited range.
+        let textView = MarkdownNSTextView(usingTextLayoutManager: false)
         textView.coordinator = context.coordinator
         textView.isRichText = true // needed to show styling; pasting is forced to plain text below
         textView.importsGraphics = false
@@ -63,17 +65,9 @@ struct MarkdownTextEditor: NSViewRepresentable {
         guard let textView = coordinator.textView else { return }
         // Match the SwiftUI color scheme (the notch forces dark content).
         textView.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
-        if textView.string != text {
-            // External change (other app, file on disk, toolbar action).
-            let selection = textView.selectedRanges
-            textView.string = text
-            let length = (text as NSString).length
-            textView.selectedRanges = selection.map { value in
-                let r = value.rangeValue
-                let location = min(r.location, length)
-                return NSValue(range: NSRange(location: location, length: min(r.length, length - location)))
-            }
-            coordinator.restyle()
+        // Don't interrupt an in-progress composition (accents, Chinese/Japanese input, emoji).
+        if textView.string != text, !textView.hasMarkedText() {
+            coordinator.replaceAll(with: text)
         } else if styleChanged {
             coordinator.restyle()
         }
@@ -103,6 +97,45 @@ struct MarkdownTextEditor: NSViewRepresentable {
             storage.endEditing()
         }
 
+        /// Applies a change made outside the editor (preview checkbox, file changed on
+        /// disk, the other app). It goes through the normal editing path so it's
+        /// registered with undo. Setting `string` directly left stale ranges on the
+        /// undo stack, and ⌘Z afterwards could crash with "range out of bounds".
+        func replaceAll(with text: String) {
+            guard let textView, let storage = textView.textStorage else { return }
+            let selection = textView.selectedRanges
+            let full = NSRange(location: 0, length: storage.length)
+            textView.breakUndoCoalescing()
+            if textView.shouldChangeText(in: full, replacementString: text) {
+                storage.replaceCharacters(in: full, with: text)
+                textView.didChangeText()
+            } else {
+                textView.undoManager?.removeAllActions(withTarget: storage)
+                textView.string = text
+            }
+            textView.breakUndoCoalescing()
+            let length = (text as NSString).length
+            let restored = selection.map { value -> NSValue in
+                let r = value.rangeValue
+                let location = min(r.location, length)
+                return NSValue(range: NSRange(location: location, length: min(r.length, length - location)))
+            }
+            if !restored.isEmpty { textView.selectedRanges = restored }
+            restyle()
+        }
+
+        /// Delegate callbacks are expected on the main thread; if AppKit ever calls
+        /// one from elsewhere, hop to main instead of trapping.
+        nonisolated private func onMain(_ work: @escaping @MainActor () -> Void) {
+            if Thread.isMainThread {
+                MainActor.assumeIsolated { work() }
+            } else {
+                DispatchQueue.main.async { MainActor.assumeIsolated { work() } }
+            }
+        }
+
+        private var isStyling = false
+
         private func style(_ storage: NSTextStorage) {
             textView?.insertionPointColor = accent
             if parent.liveFormatting {
@@ -125,20 +158,27 @@ struct MarkdownTextEditor: NSViewRepresentable {
         // Re-style after every edit (notes are small, so the whole text is fine).
         nonisolated func textStorage(_ textStorage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions,
                                      range editedRange: NSRange, changeInLength delta: Int) {
-            guard editedMask.contains(.editedCharacters) else { return }
-            MainActor.assumeIsolated { style(textStorage) }
+            guard editedMask.contains(.editedCharacters), Thread.isMainThread else { return }
+            MainActor.assumeIsolated {
+                guard !isStyling else { return }
+                isStyling = true
+                defer { isStyling = false }
+                style(textStorage)
+            }
         }
 
         nonisolated func textDidChange(_ notification: Notification) {
-            MainActor.assumeIsolated {
-                guard let textView else { return }
-                parent.text = textView.string
+            onMain { [weak self] in
+                guard let self, let textView = self.textView, self.parent.text != textView.string else { return }
+                self.parent.text = textView.string
             }
         }
 
         nonisolated func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            MainActor.assumeIsolated {
-                guard selector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            guard Thread.isMainThread, selector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            return MainActor.assumeIsolated {
+                // Let the input method handle Return while composing.
+                guard !textView.hasMarkedText() else { return false }
                 return continueList(in: textView)
             }
         }

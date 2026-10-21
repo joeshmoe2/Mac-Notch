@@ -13,7 +13,8 @@ enum MarkdownFormatting {
     }
 
     static var activeTextView: NSTextView? {
-        NSApp.keyWindow?.firstResponder as? NSTextView
+        // Only the note editor: the search field's editor is also an NSTextView.
+        NSApp.keyWindow?.firstResponder as? MarkdownNSTextView
     }
 
     static func apply(_ style: Style) {
