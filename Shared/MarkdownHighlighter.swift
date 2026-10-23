@@ -153,6 +153,7 @@ struct MarkdownHighlighter {
         // Lists and tasks.
         if let m = Self.listMarker.firstMatch(in: line, range: local) {
             storage.addAttribute(.foregroundColor, value: accent, range: offset(m.range(at: 2), by: range.location))
+            indentListItem(line, marker: m, range: range, storage: storage)
             if let t = Self.task.firstMatch(in: line, range: local) {
                 let box = offset(t.range(at: 2), by: range.location)
                 storage.addAttributes([
@@ -236,6 +237,31 @@ struct MarkdownHighlighter {
     }
 
     // MARK: Helpers
+
+    /// Makes nesting easy to see: widens the leading spaces of a list item and
+    /// lines wrapped text up under the item's text instead of under the bullet.
+    private func indentListItem(_ line: String, marker m: NSTextCheckingResult, range: NSRange,
+                                storage: NSMutableAttributedString) {
+        let ns = line as NSString
+        let leading = m.range(at: 1)
+        if leading.length > 0 {
+            // Each space is drawn wider so one Tab (4 spaces) moves the item ~2 characters' worth.
+            storage.addAttribute(.kern, value: fontSize * 0.25, range: offset(leading, by: range.location))
+        }
+        var prefixEnd = NSMaxRange(m.range)
+        if let t = Self.task.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) {
+            prefixEnd = max(prefixEnd, NSMaxRange(t.range) + 1)
+        }
+        prefixEnd = min(prefixEnd, ns.length)
+        let prefix = ns.substring(to: prefixEnd) as NSString
+        let width = prefix.size(withAttributes: [.font: baseFont]).width
+            + CGFloat(leading.length) * fontSize * 0.25
+        let style = NSMutableParagraphStyle()
+        style.lineSpacing = fontSize * 0.25
+        style.paragraphSpacing = fontSize * 0.2
+        style.headIndent = width
+        storage.addAttribute(.paragraphStyle, value: style, range: range)
+    }
 
     private func offset(_ r: NSRange, by delta: Int) -> NSRange {
         NSRange(location: r.location + delta, length: r.length)

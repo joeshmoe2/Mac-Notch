@@ -178,12 +178,73 @@ struct MarkdownTextEditor: NSViewRepresentable {
         }
 
         nonisolated func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-            guard Thread.isMainThread, selector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            guard Thread.isMainThread else { return false }
             return MainActor.assumeIsolated {
-                // Let the input method handle Return while composing.
+                // Let the input method handle keys while composing.
                 guard !textView.hasMarkedText() else { return false }
-                return continueList(in: textView)
+                switch selector {
+                case #selector(NSResponder.insertNewline(_:)): return continueList(in: textView)
+                case #selector(NSResponder.insertTab(_:)): return shiftListLines(in: textView, outdent: false)
+                case #selector(NSResponder.insertBacktab(_:)): return shiftListLines(in: textView, outdent: true)
+                default: return false
+                }
             }
+        }
+
+        // MARK: List indentation (Tab / Shift-Tab)
+
+        private static let listLine = try! NSRegularExpression(pattern: #"^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+"#)
+        /// Four spaces: valid nesting for both "- " and "1. " items in any Markdown app.
+        private static let indentUnit = "    "
+
+        private static func isListLine(_ line: String) -> Bool {
+            listLine.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length)) != nil
+        }
+
+        /// Indents (or outdents) every list item touched by the selection.
+        /// Returns false when no list item is involved, so Tab types a normal tab.
+        private func shiftListLines(in textView: NSTextView, outdent: Bool) -> Bool {
+            let text = textView.string as NSString
+            let selection = textView.selectedRange()
+            let block = text.lineRange(for: selection)
+            var lines = text.substring(with: block).components(separatedBy: "\n")
+            guard lines.contains(where: Self.isListLine) else { return false }
+
+            var firstLineDelta = 0
+            var changed = false
+            for (i, line) in lines.enumerated() where Self.isListLine(line) {
+                let shifted: String
+                if outdent {
+                    if line.hasPrefix("\t") {
+                        shifted = String(line.dropFirst())
+                    } else {
+                        let spaces = line.prefix { $0 == " " }.count
+                        shifted = String(line.dropFirst(min(spaces, Self.indentUnit.count)))
+                    }
+                } else {
+                    shifted = Self.indentUnit + line
+                }
+                if shifted != line { changed = true }
+                if i == 0 { firstLineDelta = (shifted as NSString).length - (line as NSString).length }
+                lines[i] = shifted
+            }
+            // Already at the left edge: swallow Shift-Tab instead of typing anything.
+            guard changed else { return true }
+
+            let replacement = lines.joined(separator: "\n")
+            guard textView.shouldChangeText(in: block, replacementString: replacement) else { return true }
+            textView.textStorage?.replaceCharacters(in: block, with: replacement)
+            textView.didChangeText()
+
+            if selection.length == 0 {
+                // Keep the caret on the same character of the item.
+                textView.setSelectedRange(NSRange(location: max(block.location, selection.location + firstLineDelta), length: 0))
+            } else {
+                var length = (replacement as NSString).length
+                if replacement.hasSuffix("\n") { length -= 1 }
+                textView.setSelectedRange(NSRange(location: block.location, length: length))
+            }
+            return true
         }
 
         // MARK: List continuation
@@ -212,7 +273,11 @@ struct MarkdownTextEditor: NSViewRepresentable {
             let indent = group(1) ?? ""
             let body = group(6) ?? ""
             if body.trimmingCharacters(in: .whitespaces).isEmpty {
-                // Empty item: remove the marker and end the list.
+                // Empty nested item: move it back out one level (like Shift-Tab).
+                if !indent.isEmpty {
+                    return shiftListLines(in: textView, outdent: true)
+                }
+                // Empty top-level item: remove the marker and end the list.
                 textView.insertText("", replacementRange: NSRange(location: lineRange.location, length: ns.length))
                 return true
             }

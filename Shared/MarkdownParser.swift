@@ -133,8 +133,15 @@ enum MarkdownParser {
             if listItem(line, index: i) != nil {
                 flushParagraph()
                 var items: [MarkdownBlock.ListItem] = []
+                // Indent widths of the open nesting levels, so any indent size
+                // (2 spaces, 4 spaces, tabs) nests one level at a time.
+                var levels: [Int] = []
                 while i < lines.count {
-                    if let item = listItem(lines[i], index: i) {
+                    if var item = listItem(lines[i], index: i) {
+                        let indent = item.depth
+                        while let last = levels.last, last > indent { levels.removeLast() }
+                        if levels.last.map({ $0 < indent }) ?? true { levels.append(indent) }
+                        item.depth = levels.count - 1
                         items.append(item)
                         i += 1
                     } else if !lines[i].trimmingCharacters(in: .whitespaces).isEmpty,
@@ -210,7 +217,8 @@ enum MarkdownParser {
     private static func listItem(_ line: String, index: Int) -> MarkdownBlock.ListItem? {
         guard let match = firstMatch(#"^(\s*)([-*+]|\d{1,9}[.)])\s+(.*)$"#, in: line) else { return nil }
         let indent = match[1].replacingOccurrences(of: "\t", with: "    ").count
-        let depth = indent / 2
+        // Raw indent width; `parse` turns it into a nesting level.
+        let depth = indent
         var text = match[3]
         let markerText = match[2]
         var marker: MarkdownBlock.ListItem.Marker

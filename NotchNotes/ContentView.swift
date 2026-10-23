@@ -241,7 +241,7 @@ struct NotchNotesSettings: View {
                 }
                 Toggle("Monospaced font", isOn: $monospaced)
                 Toggle("Format Markdown while typing", isOn: $liveFormatting)
-                Text("Headings, bold, italic, code, links, quotes and lists are styled as you type. Markdown symbols stay in the file but are dimmed. Click a [ ] box to tick it; Return continues a list.")
+                Text("Headings, bold, italic, code, links, quotes and lists are styled as you type. Markdown symbols stay in the file but are dimmed. Click a [ ] box to tick it; Return continues a list; Tab and Shift-Tab move a list item in and out.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
