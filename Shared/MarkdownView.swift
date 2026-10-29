@@ -25,9 +25,27 @@ struct MarkdownView: View {
         if compact {
             content
         } else {
-            ScrollView { content.padding(.bottom, 12) }
+            ScrollViewReader { proxy in
+                ScrollView { content.padding(.bottom, 12) }
+                    // In-note links like [Go to Goals](#goals) scroll to that heading.
+                    .environment(\.openURL, OpenURLAction { url in
+                        guard let anchor = MarkdownParser.anchor(fromLink: url.absoluteString) else { return .systemAction }
+                        let target = blocks.lazy.compactMap { block -> String? in
+                            guard case .heading(_, let text, let id, _) = block else { return nil }
+                            return id.lowercased() == anchor || MarkdownParser.anchorID(for: text) == MarkdownParser.anchorID(for: anchor)
+                                ? id : nil
+                        }.first
+                        guard let target else { return .discarded }
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            proxy.scrollTo(Self.scrollID(target), anchor: .top)
+                        }
+                        return .handled
+                    })
+            }
         }
     }
+
+    private static func scrollID(_ anchor: String) -> String { "heading:" + anchor }
 
     private func inline(_ text: String) -> Text {
         Text(MarkdownInline.render(text, size: baseSize))
@@ -36,13 +54,14 @@ struct MarkdownView: View {
     @ViewBuilder
     private func blockView(_ block: MarkdownBlock) -> some View {
         switch block {
-        case .heading(let level, let text):
+        case .heading(let level, let text, let anchor, _):
             VStack(alignment: .leading, spacing: 3) {
                 Text(MarkdownInline.render(text, size: headingSize(level)))
                     .font(.system(size: headingSize(level), weight: level <= 2 ? .bold : .semibold))
                     .padding(.top, compact ? 0 : baseSize * 0.3)
                 if level <= 2 && !compact { Divider() }
             }
+            .id(Self.scrollID(anchor))
 
         case .paragraph(let text):
             inline(text)

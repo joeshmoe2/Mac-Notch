@@ -150,6 +150,32 @@ enum MarkdownCheatSheet {
 
     `### My Great Heading {#custom-id}` — the `{#…}` part is hidden in Preview.
 
+    ## Links within a note
+
+    Every heading is a link target. Write the heading in lowercase with dashes for spaces:
+
+    ```
+    [Jump to the task list](#task-list)
+    ```
+
+    [Jump to the task list](#task-list) · [Back to the top](#markdown-cheat-sheet)
+
+    Click the link in Preview, or in the editor, to jump there. For a short target, give the heading an ID (see above) and link to `#custom-id`.
+
+    ## Inline HTML
+
+    | You type | You get |
+    | --- | --- |
+    | `<u>underlined</u>` | <u>underlined</u> |
+    | `<mark>highlighted</mark>` | <mark>highlighted</mark> |
+    | `<span style="color: red">red text</span>` | <span style="color: red">red text</span> |
+    | `<kbd>⌘</kbd> + <kbd>S</kbd>` | <kbd>⌘</kbd> + <kbd>S</kbd> |
+    | `H<sub>2</sub>O and x<sup>2</sup>` | H<sub>2</sub>O and x<sup>2</sup> |
+    | `<b>bold</b> <i>italic</i> <s>struck</s>` | <b>bold</b> <i>italic</i> <s>struck</s> |
+    | `line one<br>line two` | line one<br>line two |
+
+    Colors can be names (red, orange, yellow, green, blue, purple, pink, gray…) or hex like `#ff8800`. Other HTML is shown as plain text.
+
     ## Keyboard shortcuts (NotchNotes)
 
     | Action | Shortcut |

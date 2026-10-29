@@ -191,6 +191,35 @@ struct MarkdownTextEditor: NSViewRepresentable {
             }
         }
 
+        /// In-note links ("#heading") scroll the editor to that heading instead of opening a browser.
+        nonisolated func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            let target = (link as? String) ?? (link as? URL)?.absoluteString
+            guard Thread.isMainThread, let target, let anchor = MarkdownParser.anchor(fromLink: target) else { return false }
+            return MainActor.assumeIsolated {
+                jump(to: anchor, in: textView)
+                return true
+            }
+        }
+
+        private func jump(to anchor: String, in textView: NSTextView) {
+            let text = textView.string
+            guard let line = MarkdownParser.headingLine(forAnchor: anchor, in: text) else {
+                NSSound.beep()
+                return
+            }
+            let ns = text as NSString
+            var location = 0
+            var current = 0
+            while current < line, location < ns.length {
+                location = NSMaxRange(ns.lineRange(for: NSRange(location: location, length: 0)))
+                current += 1
+            }
+            let lineRange = ns.lineRange(for: NSRange(location: min(location, ns.length), length: 0))
+            textView.setSelectedRange(NSRange(location: lineRange.location, length: 0))
+            textView.scrollRangeToVisible(lineRange)
+            textView.showFindIndicator(for: lineRange)
+        }
+
         // MARK: List indentation (Tab / Shift-Tab)
 
         private static let listLine = try! NSRegularExpression(pattern: #"^[ \t]*(?:[-*+]|\d{1,9}[.)])[ \t]+"#)

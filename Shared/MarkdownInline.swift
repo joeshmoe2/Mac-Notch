@@ -4,19 +4,28 @@ import SwiftUI
 ///
 /// Foundation's parser handles **bold**, *italic*, `code`, ~~strike~~ and
 /// [links](url). On top of that we add ==highlight==, H~2~O subscript,
-/// X^2^ superscript, footnote references [^1] and :emoji: shortcodes.
+/// X^2^ superscript, footnote references [^1], :emoji: shortcodes and a few
+/// simple inline HTML tags (<u>, <mark>, <sub>, <sup>, <b>, <i>, <s>, <kbd>,
+/// <br>, and <span style="color:…">). Other HTML is shown as typed.
 enum MarkdownInline {
     static func render(_ text: String, size: CGFloat) -> AttributedString {
         let source = replaceEmoji(in: text)
         var result = AttributedString()
         // Split into plain runs and our extension tokens.
         let pattern = #"==(.+?)==|(?<!~)~(?!~)([^~\s]+)~(?!~)|\^([^\^\s]+)\^|\[\^([^\]]+)\]"#
+            + #"|<(?i:(u|ins|mark|sub|sup|b|strong|i|em|s|del|strike|kbd|small|span|font))(\s[^>]*)?>(.*?)</(?i:\5)\s*>"#
+            + #"|(<(?i:br)\s*/?>)"#
         guard let regex = MarkdownParser.cachedRegex(pattern) else {
             return foundation(source)
         }
         let ns = source as NSString
+        // Leave `code spans` alone, so `<u>x</u>` in backticks is shown as typed.
+        let codeSpans = MarkdownParser.cachedRegex(#"(`+)[^`]*?\1"#)?
+            .matches(in: source, range: NSRange(location: 0, length: ns.length)).map(\.range) ?? []
         var cursor = 0
-        for match in regex.matches(in: source, range: NSRange(location: 0, length: ns.length)) {
+        for match in regex.matches(in: source, range: NSRange(location: 0, length: ns.length))
+        where match.range.location >= cursor
+            && !codeSpans.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) {
             if match.range.location > cursor {
                 result += foundation(ns.substring(with: NSRange(location: cursor, length: match.range.location - cursor)))
             }
@@ -39,6 +48,13 @@ enum MarkdownInline {
                 part.font = .system(size: size * 0.72)
                 part.baselineOffset = size * 0.4
                 result += part
+            } else if let tagRange = Range(match.range(at: 5), in: source),
+                      let innerRange = Range(match.range(at: 7), in: source) {
+                let attributes = Range(match.range(at: 6), in: source).map { String(source[$0]) } ?? ""
+                result += html(tag: source[tagRange].lowercased(), attributes: attributes,
+                               inner: render(String(source[innerRange]), size: size), size: size)
+            } else if match.range(at: 8).location != NSNotFound {
+                result += AttributedString("\n")
             }
             cursor = match.range.location + match.range.length
         }
@@ -46,6 +62,87 @@ enum MarkdownInline {
             result += foundation(ns.substring(from: cursor))
         }
         return result
+    }
+
+    // MARK: Inline HTML
+
+    private static func html(tag: String, attributes: String, inner: AttributedString, size: CGFloat) -> AttributedString {
+        var part = inner
+        switch tag {
+        case "u", "ins":
+            part.underlineStyle = Text.LineStyle.single
+        case "s", "del", "strike":
+            part.strikethroughStyle = Text.LineStyle.single
+        case "mark":
+            part.backgroundColor = Color.yellow.opacity(0.45)
+        case "sub":
+            part.font = .system(size: size * 0.72)
+            part.baselineOffset = -size * 0.2
+        case "sup":
+            part.font = .system(size: size * 0.72)
+            part.baselineOffset = size * 0.4
+        case "small":
+            part.font = .system(size: size * 0.82)
+        case "b", "strong":
+            addIntent(.stronglyEmphasized, to: &part)
+        case "i", "em":
+            addIntent(.emphasized, to: &part)
+        case "kbd":
+            part.font = .system(size: size * 0.88, design: .monospaced)
+            part.backgroundColor = Color.primary.opacity(0.12)
+        case "span", "font":
+            if let color = color(fromAttributes: attributes) { part.foregroundColor = color }
+        default:
+            break
+        }
+        return part
+    }
+
+    /// Adds bold/italic on top of whatever the inner text already has (code, links…).
+    private static func addIntent(_ intent: InlinePresentationIntent, to part: inout AttributedString) {
+        for run in part.runs {
+            var combined = run.inlinePresentationIntent ?? []
+            combined.insert(intent)
+            part[run.range].inlinePresentationIntent = combined
+        }
+    }
+
+    /// Reads `style="color: red"` or `color="#ff0000"`.
+    private static func color(fromAttributes attributes: String) -> Color? {
+        let patterns = [#"(?i)color\s*:\s*([#\w]+)"#, #"(?i)color\s*=\s*["']?([#\w]+)"#]
+        for pattern in patterns {
+            if let match = MarkdownParser.firstMatch(pattern, in: attributes), match.count > 1 {
+                return namedColor(match[1])
+            }
+        }
+        return nil
+    }
+
+    private static func namedColor(_ value: String) -> Color? {
+        let name = value.lowercased()
+        if name.hasPrefix("#") {
+            var hex = String(name.dropFirst())
+            if hex.count == 3 { hex = hex.map { "\($0)\($0)" }.joined() }
+            return Color(hex: "#" + hex)
+        }
+        switch name {
+        case "red": return .red
+        case "orange": return .orange
+        case "yellow", "gold": return .yellow
+        case "green", "lime": return .green
+        case "mint": return .mint
+        case "teal": return .teal
+        case "cyan", "aqua": return .cyan
+        case "blue", "navy": return .blue
+        case "indigo": return .indigo
+        case "purple", "violet", "magenta", "fuchsia": return .purple
+        case "pink": return .pink
+        case "brown": return .brown
+        case "gray", "grey", "silver": return .gray
+        case "black": return .black
+        case "white": return .white
+        default: return nil
+        }
     }
 
     private static func foundation(_ text: String) -> AttributedString {

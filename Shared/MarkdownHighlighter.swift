@@ -42,6 +42,7 @@ struct MarkdownHighlighter {
     private static let footnoteRef = regex(#"\[\^[^\]\s]+\]"#)
     private static let tablePipe = regex(#"\|"#)
     private static let headingID = regex(#"\s\{#[^}]*\}\s*$"#)
+    private static let htmlTag = regex(#"</?(?:u|ins|mark|sub|sup|b|strong|i|em|s|del|strike|kbd|small|span|font|br)\b[^>\n]*>"#, .caseInsensitive)
 
     // MARK: Apply
 
@@ -226,10 +227,18 @@ struct MarkdownHighlighter {
                 .foregroundColor: NSColor.linkColor,
                 .underlineStyle: NSUnderlineStyle.single.rawValue,
             ]
-            if let url = URL(string: text.substring(with: urlRange)), url.scheme != nil {
+            let target = text.substring(with: urlRange)
+            if target.hasPrefix("#") {
+                // In-note link: the editor jumps to the heading when it's clicked.
+                attributes[.link] = target
+            } else if let url = URL(string: target), url.scheme != nil {
                 attributes[.link] = url
             }
             storage.addAttributes(attributes, range: title)
+        }
+        // Supported inline HTML tags are dimmed like other Markdown markers.
+        for m in Self.htmlTag.matches(in: string, range: full) where free(m.range) {
+            dim(m.range, storage)
         }
         for m in Self.footnoteRef.matches(in: string, range: full) where free(m.range) {
             storage.addAttribute(.foregroundColor, value: accent, range: m.range)

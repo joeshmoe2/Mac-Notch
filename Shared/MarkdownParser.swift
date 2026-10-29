@@ -14,7 +14,8 @@ enum MarkdownBlock {
 
     enum Alignment { case leading, center, trailing }
 
-    case heading(level: Int, text: String)
+    /// `anchor` is the heading's link target (`[Jump](#anchor)`); `line` is its source line.
+    case heading(level: Int, text: String, anchor: String, line: Int)
     case paragraph(String)
     case quote(String)
     case list([ListItem])
@@ -36,6 +37,14 @@ enum MarkdownParser {
         var footnotes: [(label: String, text: String)] = []
         var paragraph: [String] = []
         var i = 0
+        var anchorCounts: [String: Int] = [:]
+
+        /// GitHub-style: duplicate headings get "-1", "-2", … appended.
+        func uniqueAnchor(_ base: String) -> String {
+            let n = anchorCounts[base, default: 0]
+            anchorCounts[base] = n + 1
+            return n == 0 ? base : "\(base)-\(n)"
+        }
 
         func flushParagraph() {
             guard !paragraph.isEmpty else { return }
@@ -74,11 +83,14 @@ enum MarkdownParser {
             if let match = firstMatch(#"^(#{1,6})\s+(.*?)\s*#*\s*$"#, in: trimmed) {
                 flushParagraph()
                 var text = match[2]
-                // Strip a custom heading ID: "My Heading {#custom-id}".
+                var anchor: String?
+                // Custom heading ID: "My Heading {#custom-id}".
                 if let idRange = text.range(of: #"\s*\{#[^}]*\}$"#, options: .regularExpression) {
+                    anchor = String(text[idRange]).trimmingCharacters(in: CharacterSet(charactersIn: " \t{}#"))
                     text.removeSubrange(idRange)
                 }
-                blocks.append(.heading(level: match[1].count, text: text))
+                let id = anchor.flatMap { $0.isEmpty ? nil : $0 } ?? uniqueAnchor(anchorID(for: text))
+                blocks.append(.heading(level: match[1].count, text: text, anchor: id, line: i))
                 i += 1
                 continue
             }
@@ -88,8 +100,9 @@ enum MarkdownParser {
                 // "Text\n---" is a setext heading in CommonMark.
                 if !paragraph.isEmpty, trimmed.hasPrefix("-") || trimmed.hasPrefix("=") {
                     let text = paragraph.joined(separator: " ")
+                    let start = i - paragraph.count
                     paragraph.removeAll()
-                    blocks.append(.heading(level: 2, text: text))
+                    blocks.append(.heading(level: 2, text: text, anchor: uniqueAnchor(anchorID(for: text)), line: start))
                 } else {
                     flushParagraph()
                     blocks.append(.rule)
@@ -99,8 +112,9 @@ enum MarkdownParser {
             }
             if !paragraph.isEmpty, trimmed.range(of: #"^=+$"#, options: .regularExpression) != nil {
                 let text = paragraph.joined(separator: " ")
+                let start = i - paragraph.count
                 paragraph.removeAll()
-                blocks.append(.heading(level: 1, text: text))
+                blocks.append(.heading(level: 1, text: text, anchor: uniqueAnchor(anchorID(for: text)), line: start))
                 i += 1
                 continue
             }
@@ -210,6 +224,46 @@ enum MarkdownParser {
         flushParagraph()
         if !footnotes.isEmpty { blocks.append(.footnotes(footnotes)) }
         return blocks
+    }
+
+    // MARK: Anchors
+
+    /// Link target for a heading, the way GitHub makes them:
+    /// "My Great Heading!" → "my-great-heading".
+    static func anchorID(for heading: String) -> String {
+        var text = heading
+        // [text](url) → text, and drop HTML tags.
+        text = text.replacingOccurrences(of: #"!?\[([^\]]*)\]\([^)]*\)"#, with: "$1", options: .regularExpression)
+        text = text.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+        var out = ""
+        for ch in text.lowercased() {
+            if ch.isLetter || ch.isNumber || ch == "-" || ch == "_" {
+                out.append(ch)
+            } else if ch == " " {
+                out.append("-")
+            }
+        }
+        return out
+    }
+
+    /// The heading anchor a link points to, if it's an in-note link like "#my-heading".
+    static func anchor(fromLink link: String) -> String? {
+        guard link.hasPrefix("#"), link.count > 1 else { return nil }
+        let raw = String(link.dropFirst())
+        return (raw.removingPercentEncoding ?? raw).lowercased()
+    }
+
+    /// Source line of the heading with `anchor` (case-insensitive), if any.
+    static func headingLine(forAnchor anchor: String, in source: String) -> Int? {
+        let wanted = anchor.lowercased()
+        let target = anchorID(for: anchor)
+        for block in parse(source) {
+            if case .heading(_, let text, let id, let line) = block,
+               id.lowercased() == wanted || anchorID(for: text) == target {
+                return line
+            }
+        }
+        return nil
     }
 
     // MARK: Helpers
