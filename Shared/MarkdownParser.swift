@@ -246,13 +246,6 @@ enum MarkdownParser {
         return out
     }
 
-    /// The heading anchor a link points to, if it's an in-note link like "#my-heading".
-    static func anchor(fromLink link: String) -> String? {
-        guard link.hasPrefix("#"), link.count > 1 else { return nil }
-        let raw = String(link.dropFirst())
-        return (raw.removingPercentEncoding ?? raw).lowercased()
-    }
-
     /// Source line of the heading with `anchor` (case-insensitive), if any.
     static func headingLine(forAnchor anchor: String, in source: String) -> Int? {
         let wanted = anchor.lowercased()

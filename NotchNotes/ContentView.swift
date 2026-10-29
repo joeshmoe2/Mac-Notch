@@ -193,7 +193,9 @@ private struct NoteEditor: View {
             monospaced: monospaced,
             liveFormatting: liveFormatting,
             accentHex: SharedAccent.shared.hex,
-            inset: CGSize(width: 20, height: 14)
+            inset: CGSize(width: 20, height: 14),
+            onOpenNote: { name, anchor in model.openLinkedNote(named: name, anchor: anchor) },
+            anchorRequest: model.anchorNoteID == note.id ? model.anchorRequest : nil
         )
     }
 
@@ -202,7 +204,9 @@ private struct NoteEditor: View {
             text: store.note(id: note.id)?.body ?? note.body,
             baseSize: fontSize,
             baseURL: store.folder,
-            onToggleTask: { line in store.toggleCheckbox(note.id, line: line) }
+            onToggleTask: { line in store.toggleCheckbox(note.id, line: line) },
+            onOpenNote: { name, anchor in model.openLinkedNote(named: name, anchor: anchor) },
+            anchorRequest: model.anchorNoteID == note.id ? model.anchorRequest : nil
         )
         .padding(.horizontal, 24)
         .padding(.top, 16)

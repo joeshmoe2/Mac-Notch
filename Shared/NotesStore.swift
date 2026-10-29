@@ -171,6 +171,18 @@ final class NotesStore {
         notes.first { $0.fileName == fileName }
     }
 
+    /// The note a link like `[[Name]]` points to: matched by title or file name,
+    /// ignoring case. If there isn't one, a new note with that title is created,
+    /// so links can be written before the note exists.
+    func noteForLink(named name: String) -> Note {
+        let wanted = name.trimmingCharacters(in: .whitespaces).lowercased()
+        if let match = notes.first(where: { $0.title.lowercased() == wanted })
+            ?? notes.first(where: { ($0.fileName as NSString).deletingPathExtension.lowercased() == wanted }) {
+            return match
+        }
+        return createNote(body: "# \(name.trimmingCharacters(in: .whitespaces))\n\n")
+    }
+
     func update(_ id: NoteID, body: String) {
         guard let i = notes.firstIndex(where: { $0.id == id }), notes[i].body != body else { return }
         notes[i].body = body

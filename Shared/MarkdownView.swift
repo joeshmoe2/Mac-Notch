@@ -10,6 +10,10 @@ struct MarkdownView: View {
     /// Compact mode (Home tile): tighter spacing, no scrolling.
     var compact = false
     var onToggleTask: ((Int) -> Void)?
+    /// Called for links to other notes (`[[Name]]`, `[x](Name.md#Heading)`).
+    var onOpenNote: ((_ name: String, _ anchor: String?) -> Void)? = nil
+    /// Scrolls to this heading when it changes (e.g. after following a link from another note).
+    var anchorRequest: AnchorRequest? = nil
 
     var body: some View {
         let blocks = MarkdownParser.parse(text)
@@ -24,25 +28,51 @@ struct MarkdownView: View {
 
         if compact {
             content
+                .environment(\.openURL, OpenURLAction { url in handle(url, proxy: nil, blocks: blocks) })
         } else {
             ScrollViewReader { proxy in
                 ScrollView { content.padding(.bottom, 12) }
-                    // In-note links like [Go to Goals](#goals) scroll to that heading.
-                    .environment(\.openURL, OpenURLAction { url in
-                        guard let anchor = MarkdownParser.anchor(fromLink: url.absoluteString) else { return .systemAction }
-                        let target = blocks.lazy.compactMap { block -> String? in
-                            guard case .heading(_, let text, let id, _) = block else { return nil }
-                            return id.lowercased() == anchor || MarkdownParser.anchorID(for: text) == MarkdownParser.anchorID(for: anchor)
-                                ? id : nil
-                        }.first
-                        guard let target else { return .discarded }
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            proxy.scrollTo(Self.scrollID(target), anchor: .top)
-                        }
-                        return .handled
-                    })
+                    .environment(\.openURL, OpenURLAction { url in handle(url, proxy: proxy, blocks: blocks) })
+                    .onAppear {
+                        guard let anchorRequest else { return }
+                        // Wait one pass so the content is laid out before scrolling.
+                        DispatchQueue.main.async { scroll(to: anchorRequest.anchor, proxy: proxy, blocks: blocks) }
+                    }
+                    .onChange(of: anchorRequest) { _, request in
+                        guard let request else { return }
+                        DispatchQueue.main.async { scroll(to: request.anchor, proxy: proxy, blocks: blocks) }
+                    }
             }
         }
+    }
+
+    private func handle(_ url: URL, proxy: ScrollViewProxy?, blocks: [MarkdownBlock]) -> OpenURLAction.Result {
+        switch NoteLink.decode(url) {
+        case .anchor(let anchor):
+            guard let proxy else { return .discarded }
+            return scroll(to: anchor, proxy: proxy, blocks: blocks) ? .handled : .discarded
+        case .note(let name, let anchor):
+            guard let onOpenNote else { return .discarded }
+            onOpenNote(name, anchor)
+            return .handled
+        case .external, nil:
+            return .systemAction
+        }
+    }
+
+    @discardableResult
+    private func scroll(to anchor: String, proxy: ScrollViewProxy, blocks: [MarkdownBlock]) -> Bool {
+        let wanted = anchor.lowercased()
+        let slug = MarkdownParser.anchorID(for: anchor)
+        let target = blocks.lazy.compactMap { block -> String? in
+            guard case .heading(_, let text, let id, _) = block else { return nil }
+            return id.lowercased() == wanted || MarkdownParser.anchorID(for: text) == slug ? id : nil
+        }.first
+        guard let target else { return false }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            proxy.scrollTo(Self.scrollID(target), anchor: .top)
+        }
+        return true
     }
 
     private static func scrollID(_ anchor: String) -> String { "heading:" + anchor }

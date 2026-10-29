@@ -152,15 +152,26 @@ enum MarkdownCheatSheet {
 
     ## Links within a note
 
-    Every heading is a link target. Write the heading in lowercase with dashes for spaces:
+    Every heading is a link target. Type the heading's name after `#` (spaces are fine):
 
     ```
-    [Jump to the task list](#task-list)
+    [Jump to the task list](#Task list)
     ```
 
-    [Jump to the task list](#task-list) · [Back to the top](#markdown-cheat-sheet)
+    [Jump to the task list](#Task list) · [Back to the top](#Markdown Cheat Sheet)
 
-    Click the link in Preview, or in the editor, to jump there. For a short target, give the heading an ID (see above) and link to `#custom-id`.
+    Click the link in Preview, or in the editor, to jump there. `#task-list` works too, and so does a heading ID (see above) like `#custom-id`.
+
+    ## Links to other notes
+
+    ```
+    [[Shopping List]]
+    [[Shopping List#Groceries]]
+    [[Shopping List|my list]]
+    [see my list](Shopping List)
+    ```
+
+    Put a note's title in double square brackets. Add `#Heading` to jump to a heading in it, or `|text` to show different text. If the note doesn't exist yet, clicking the link creates it.
 
     ## Inline HTML
 

@@ -15,6 +15,10 @@ struct MarkdownTextEditor: NSViewRepresentable {
     /// "#RRGGBB" accent (from NotchHub's Appearance settings); nil = system accent.
     var accentHex: String?
     var inset = CGSize(width: 12, height: 10)
+    /// Called for links to other notes (`[[Name]]`, `[x](Name.md#Heading)`).
+    var onOpenNote: ((_ name: String, _ anchor: String?) -> Void)? = nil
+    /// Jumps to this heading when it changes (after following a link from another note).
+    var anchorRequest: AnchorRequest? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -74,6 +78,14 @@ struct MarkdownTextEditor: NSViewRepresentable {
         } else if styleChanged {
             coordinator.restyle()
         }
+        if let request = anchorRequest, request != coordinator.handledAnchorRequest {
+            coordinator.handledAnchorRequest = request
+            // After this update pass, so a freshly opened note is laid out first.
+            DispatchQueue.main.async { [weak textView] in
+                guard let textView else { return }
+                coordinator.jump(to: request.anchor, in: textView)
+            }
+        }
     }
 
     @MainActor
@@ -98,6 +110,7 @@ struct MarkdownTextEditor: NSViewRepresentable {
             storage.beginEditing()
             style(storage)
             storage.endEditing()
+            applyViewAttributes()
         }
 
         /// Applies a change made outside the editor (preview checkbox, file changed on
@@ -139,8 +152,12 @@ struct MarkdownTextEditor: NSViewRepresentable {
 
         private var isStyling = false
 
+        /// Only text attributes: this runs inside the text storage's edit
+        /// (didProcessEditing), where the text view's layout and selection still
+        /// describe the old text. Touching the text view here (insertion point
+        /// color, typing attributes) made it look up the caret at a position that
+        /// no longer existed after deleting a selection, and crashed.
         private func style(_ storage: NSTextStorage) {
-            textView?.insertionPointColor = accent
             if parent.liveFormatting {
                 highlighter.apply(to: storage)
             } else {
@@ -150,7 +167,13 @@ struct MarkdownTextEditor: NSViewRepresentable {
                 storage.setAttributes([.font: font, .foregroundColor: NSColor.labelColor],
                                       range: NSRange(location: 0, length: storage.length))
             }
-            textView?.typingAttributes = [
+        }
+
+        /// Text-view settings, applied once an edit has fully finished.
+        private func applyViewAttributes() {
+            guard let textView else { return }
+            if textView.insertionPointColor != accent { textView.insertionPointColor = accent }
+            textView.typingAttributes = [
                 .font: parent.monospaced
                     ? NSFont.monospacedSystemFont(ofSize: parent.fontSize, weight: .regular)
                     : NSFont.systemFont(ofSize: parent.fontSize),
@@ -172,7 +195,9 @@ struct MarkdownTextEditor: NSViewRepresentable {
 
         nonisolated func textDidChange(_ notification: Notification) {
             onMain { [weak self] in
-                guard let self, let textView = self.textView, self.parent.text != textView.string else { return }
+                guard let self, let textView = self.textView else { return }
+                self.applyViewAttributes()
+                guard self.parent.text != textView.string else { return }
                 self.parent.text = textView.string
             }
         }
@@ -191,17 +216,37 @@ struct MarkdownTextEditor: NSViewRepresentable {
             }
         }
 
-        /// In-note links ("#heading") scroll the editor to that heading instead of opening a browser.
+        /// Links to a heading jump the editor there; links to another note open it.
+        /// Web links are left to the system.
         nonisolated func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
-            let target = (link as? String) ?? (link as? URL)?.absoluteString
-            guard Thread.isMainThread, let target, let anchor = MarkdownParser.anchor(fromLink: target) else { return false }
+            let resolved: NoteLink?
+            if let url = link as? URL {
+                resolved = NoteLink.decode(url)
+            } else if let string = link as? String {
+                resolved = NoteLink.resolve(string)
+            } else {
+                resolved = nil
+            }
+            guard Thread.isMainThread, let resolved else { return false }
             return MainActor.assumeIsolated {
-                jump(to: anchor, in: textView)
-                return true
+                switch resolved {
+                case .anchor(let anchor):
+                    jump(to: anchor, in: textView)
+                    return true
+                case .note(let name, let anchor):
+                    guard let open = parent.onOpenNote else { return false }
+                    open(name, anchor)
+                    return true
+                case .external:
+                    return false
+                }
             }
         }
 
-        private func jump(to anchor: String, in textView: NSTextView) {
+        /// Last heading-jump request handled (see `anchorRequest`).
+        var handledAnchorRequest: AnchorRequest?
+
+        func jump(to anchor: String, in textView: NSTextView) {
             let text = textView.string
             guard let line = MarkdownParser.headingLine(forAnchor: anchor, in: text) else {
                 NSSound.beep()

@@ -141,9 +141,10 @@ struct NotesExpandedView: View {
                     .foregroundStyle(armedDeleteID == note.id ? Color.red : Color.primary)
                 }
                 if previewMode {
-                    MarkdownView(text: note.body, baseSize: fontSize, baseURL: module.store.folder) { line in
-                        module.toggleCheckbox(noteID: note.id, line: line)
-                    }
+                    MarkdownView(text: note.body, baseSize: fontSize, baseURL: module.store.folder,
+                                 onToggleTask: { line in module.toggleCheckbox(noteID: note.id, line: line) },
+                                 onOpenNote: { name, anchor in module.openLinkedNote(named: name, anchor: anchor) },
+                                 anchorRequest: module.anchorNoteID == note.id ? module.anchorRequest : nil)
                 } else {
                     MarkdownTextEditor(
                         text: Binding(
@@ -154,7 +155,9 @@ struct NotesExpandedView: View {
                         monospaced: monospaced,
                         liveFormatting: liveFormatting,
                         accentHex: accentHex,
-                        inset: CGSize(width: 6, height: 6)
+                        inset: CGSize(width: 6, height: 6),
+                        onOpenNote: { name, anchor in module.openLinkedNote(named: name, anchor: anchor) },
+                        anchorRequest: module.anchorNoteID == note.id ? module.anchorRequest : nil
                     )
                     .background(RoundedRectangle(cornerRadius: 8).fill(Color.white.opacity(0.05)))
                 }

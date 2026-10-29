@@ -71,6 +71,10 @@ final class NotesAppModel {
     var viewMode: EditorMode = .split
     /// Note waiting for delete confirmation.
     var pendingDeleteID: NoteID?
+    /// Heading to show after following a link (see `openLinkedNote`).
+    var anchorRequest: AnchorRequest?
+    /// The note `anchorRequest` belongs to.
+    var anchorNoteID: NoteID?
 
     init() {
         viewMode = EditorMode(rawValue: UserDefaults.standard.string(forKey: "viewMode") ?? "") ?? .split
@@ -125,6 +129,20 @@ final class NotesAppModel {
         let body = note.body.isEmpty || note.body.hasSuffix("\n") ? note.body + "- [ ] " : note.body + "\n- [ ] "
         store.update(note.id, body: body)
         if viewMode == .preview { viewMode = .split }
+    }
+
+    /// Follows a link to another note (creating it if needed), then its heading if any.
+    func openLinkedNote(named name: String, anchor: String?) {
+        searchText = ""
+        selection = store.noteForLink(named: name).id
+        let request = anchor.map { AnchorRequest(anchor: $0) }
+        anchorRequest = request
+        anchorNoteID = selection
+        // One-shot: don't jump again when the note is reopened later.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            if let self, self.anchorRequest == request { self.anchorRequest = nil }
+        }
     }
 
     func openCheatSheet() {

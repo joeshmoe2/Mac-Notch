@@ -35,6 +35,23 @@ final class NotesModule: NotchModule {
 
     var notes: [Note] { store.notes }
     var selected: Note? { store.note(id: selectedID) }
+    /// Heading to show after following a link from another note.
+    var anchorRequest: AnchorRequest?
+    /// The note `anchorRequest` belongs to.
+    var anchorNoteID: NoteID?
+
+    /// Follows a `[[link]]` to another note in the notch (creating it if needed).
+    func openLinkedNote(named name: String, anchor: String?) {
+        selectedID = store.noteForLink(named: name).id
+        let request = anchor.map { AnchorRequest(anchor: $0) }
+        anchorRequest = request
+        anchorNoteID = selectedID
+        // One-shot: don't jump again when the note is reopened later.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            if let self, self.anchorRequest == request { self.anchorRequest = nil }
+        }
+    }
 
     var pinnedID: NoteID? {
         pinnedFile.isEmpty ? nil : store.note(fileName: pinnedFile)?.id

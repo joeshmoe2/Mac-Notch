@@ -38,7 +38,8 @@ struct MarkdownHighlighter {
     private static let strike = regex(#"(~~)(?=\S)(.+?)(?<=\S)~~"#)
     private static let code = regex(#"(`+)([^`\n]+?)\1"#)
     private static let highlight = regex(#"(==)(?=\S)(.+?)(?<=\S)=="#)
-    private static let link = regex(#"(!?)\[([^\]\n]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)"#)
+    private static let link = regex(#"(!?)\[([^\[\]\n]+)\]\((<[^>\n]*>|[^)\n]*?)(?:\s+"[^"]*")?\)"#)
+    private static let wikiLink = regex(#"\[\[([^\[\]\n]+)\]\]"#)
     private static let footnoteRef = regex(#"\[\^[^\]\s]+\]"#)
     private static let tablePipe = regex(#"\|"#)
     private static let headingID = regex(#"\s\{#[^}]*\}\s*$"#)
@@ -227,14 +228,23 @@ struct MarkdownHighlighter {
                 .foregroundColor: NSColor.linkColor,
                 .underlineStyle: NSUnderlineStyle.single.rawValue,
             ]
-            let target = text.substring(with: urlRange)
-            if target.hasPrefix("#") {
-                // In-note link: the editor jumps to the heading when it's clicked.
-                attributes[.link] = target
-            } else if let url = URL(string: target), url.scheme != nil {
+            // Headings and other notes get a notchnote: URL the editor handles on click.
+            if let url = NoteLink.resolve(text.substring(with: urlRange))?.url {
                 attributes[.link] = url
             }
             storage.addAttributes(attributes, range: title)
+        }
+        for m in Self.wikiLink.matches(in: string, range: full) where free(m.range) {
+            let inner = m.range(at: 1)
+            dim(m.range, storage)
+            var attributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: NSColor.linkColor,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+            ]
+            if let url = NoteLink.resolveWiki(text.substring(with: inner))?.link.url {
+                attributes[.link] = url
+            }
+            storage.addAttributes(attributes, range: inner)
         }
         // Supported inline HTML tags are dimmed like other Markdown markers.
         for m in Self.htmlTag.matches(in: string, range: full) where free(m.range) {

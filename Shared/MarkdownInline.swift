@@ -15,6 +15,8 @@ enum MarkdownInline {
         let pattern = #"==(.+?)==|(?<!~)~(?!~)([^~\s]+)~(?!~)|\^([^\^\s]+)\^|\[\^([^\]]+)\]"#
             + #"|<(?i:(u|ins|mark|sub|sup|b|strong|i|em|s|del|strike|kbd|small|span|font))(\s[^>]*)?>(.*?)</(?i:\5)\s*>"#
             + #"|(<(?i:br)\s*/?>)"#
+            + #"|\[\[([^\[\]\n]+)\]\]"#
+            + #"|(?<!!)\[([^\[\]\n]+)\]\((<[^>\n]*>|[^)\n]*)\)"#
         guard let regex = MarkdownParser.cachedRegex(pattern) else {
             return foundation(source)
         }
@@ -55,6 +57,24 @@ enum MarkdownInline {
                                inner: render(String(source[innerRange]), size: size), size: size)
             } else if match.range(at: 8).location != NSNotFound {
                 result += AttributedString("\n")
+            } else if let r = Range(match.range(at: 9), in: source) {
+                // [[Other Note]], [[Other Note#Heading]], [[Other Note|label]]
+                if let wiki = NoteLink.resolveWiki(String(source[r])) {
+                    var part = AttributedString(wiki.label)
+                    if let url = wiki.link.url { part.link = url }
+                    result += part
+                } else {
+                    result += AttributedString(ns.substring(with: match.range))
+                }
+            } else if let textRange = Range(match.range(at: 10), in: source),
+                      let destinationRange = Range(match.range(at: 11), in: source) {
+                // [text](destination): handled here so destinations may contain spaces
+                // and can point at headings or other notes.
+                let destination = String(source[destinationRange])
+                    .replacingOccurrences(of: #"\s+"[^"]*"\s*$"#, with: "", options: .regularExpression)
+                var part = render(String(source[textRange]), size: size)
+                if let url = NoteLink.resolve(destination)?.url { part.link = url }
+                result += part
             }
             cursor = match.range.location + match.range.length
         }
